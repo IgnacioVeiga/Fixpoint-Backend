@@ -1,6 +1,6 @@
 package com.fixpoint.tickets.repository;
 
-import com.fixpoint.tickets.model.Ticket;
+import com.fixpoint.tickets.entity.Ticket;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;

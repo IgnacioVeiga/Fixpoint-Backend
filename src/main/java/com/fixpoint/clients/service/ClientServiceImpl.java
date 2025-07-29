@@ -2,7 +2,7 @@ package com.fixpoint.clients.service;
 
 import com.fixpoint.clients.dto.ClientDTO;
 import com.fixpoint.clients.dto.CreateClientDTO;
-import com.fixpoint.clients.model.Client;
+import com.fixpoint.clients.entity.Client;
 import com.fixpoint.clients.repository.ClientRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;

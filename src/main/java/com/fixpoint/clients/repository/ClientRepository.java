@@ -1,6 +1,6 @@
 package com.fixpoint.clients.repository;
 
-import com.fixpoint.clients.model.Client;
+import com.fixpoint.clients.entity.Client;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;

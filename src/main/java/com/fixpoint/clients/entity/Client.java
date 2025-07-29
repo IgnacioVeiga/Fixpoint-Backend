@@ -1,4 +1,4 @@
-package com.fixpoint.clients.model;
+package com.fixpoint.clients.entity;
 
 import jakarta.persistence.*;
 import lombok.*;

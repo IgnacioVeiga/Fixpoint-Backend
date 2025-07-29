@@ -1,7 +1,7 @@
 package com.fixpoint.tickets.service;
 
 import com.fixpoint.clients.repository.ClientRepository;
-import com.fixpoint.tickets.model.Ticket;
+import com.fixpoint.tickets.entity.Ticket;
 import com.fixpoint.tickets.dto.CreateTicketDTO;
 import com.fixpoint.tickets.dto.TicketDTO;
 import com.fixpoint.tickets.repository.TicketRepository;

@@ -1,5 +1,6 @@
-package com.fixpoint.tickets.model;
+package com.fixpoint.ticketlogs.entity;
 
+import com.fixpoint.tickets.entity.Ticket;
 import jakarta.persistence.*;
 import lombok.*;
 

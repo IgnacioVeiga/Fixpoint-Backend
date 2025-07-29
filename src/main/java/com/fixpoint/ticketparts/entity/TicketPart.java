@@ -1,6 +1,7 @@
-package com.fixpoint.tickets.model;
+package com.fixpoint.ticketparts.entity;
 
-import com.fixpoint.entities.Inventory;
+import com.fixpoint.inventory.entity.Inventory;
+import com.fixpoint.tickets.entity.Ticket;
 import jakarta.persistence.*;
 import lombok.*;
 

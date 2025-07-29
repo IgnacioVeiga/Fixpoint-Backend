@@ -1,4 +1,4 @@
-package com.fixpoint.entities;
+package com.fixpoint.inventory.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
