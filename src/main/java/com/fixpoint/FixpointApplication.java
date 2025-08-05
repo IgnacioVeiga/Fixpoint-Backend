@@ -7,7 +7,12 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class FixpointApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(FixpointApplication.class, args);
+		try {
+			SpringApplication.run(FixpointApplication.class, args);
+		} catch (Throwable ex) {
+			com.fixpoint.components.ApplicationErrorHandler.handle(ex);
+			throw ex;
+		}
 	}
 
 }
