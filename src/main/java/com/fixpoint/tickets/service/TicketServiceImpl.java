@@ -6,6 +6,7 @@ import com.fixpoint.tickets.dto.CreateTicketDTO;
 import com.fixpoint.tickets.dto.TicketDTO;
 import com.fixpoint.tickets.repository.TicketRepository;
 import jakarta.persistence.EntityNotFoundException;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -13,15 +14,11 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class TicketServiceImpl implements TicketService {
 
     private final TicketRepository ticketRepository;
     private final ClientRepository clientRepository;
-
-    public TicketServiceImpl(TicketRepository ticketRepository, ClientRepository clientRepository) {
-        this.ticketRepository = ticketRepository;
-        this.clientRepository = clientRepository;
-    }
 
     @Override
     public List<TicketDTO> getAll() {

@@ -4,19 +4,18 @@ import com.fixpoint.clients.dto.ClientDTO;
 import com.fixpoint.clients.dto.CreateClientDTO;
 import com.fixpoint.clients.service.ClientService;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/clients")
+@RequiredArgsConstructor
 public class ClientController {
 
     private final ClientService service;
-
-    public ClientController(ClientService service) {
-        this.service = service;
-    }
 
     @GetMapping
     public List<ClientDTO> getAll() {
@@ -37,10 +36,11 @@ public class ClientController {
     public ClientDTO update(@PathVariable Long id, @Valid @RequestBody CreateClientDTO dto) {
         return service.update(id, dto);
     }
-
+    
     @DeleteMapping("/{id}")
-    public void delete(@PathVariable Long id) {
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.delete(id);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/search")

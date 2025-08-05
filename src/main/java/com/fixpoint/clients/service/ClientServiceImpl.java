@@ -5,18 +5,16 @@ import com.fixpoint.clients.dto.CreateClientDTO;
 import com.fixpoint.clients.entity.Client;
 import com.fixpoint.clients.repository.ClientRepository;
 import jakarta.persistence.EntityNotFoundException;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class ClientServiceImpl implements ClientService {
 
     private final ClientRepository repo;
-
-    public ClientServiceImpl(ClientRepository repo) {
-        this.repo = repo;
-    }
 
     @Override
     public List<ClientDTO> getAll() {

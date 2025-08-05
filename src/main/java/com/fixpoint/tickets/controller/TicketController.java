@@ -4,19 +4,18 @@ import com.fixpoint.tickets.dto.CreateTicketDTO;
 import com.fixpoint.tickets.dto.TicketDTO;
 import com.fixpoint.tickets.service.TicketService;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/tickets")
+@RequiredArgsConstructor
 public class TicketController {
 
     private final TicketService service;
-
-    public TicketController(TicketService service) {
-        this.service = service;
-    }
 
     @GetMapping
     public List<TicketDTO> getAll() {
@@ -37,10 +36,11 @@ public class TicketController {
     public TicketDTO update(@PathVariable Long id, @Valid @RequestBody CreateTicketDTO dto) {
         return service.update(id, dto);
     }
-
+    
     @DeleteMapping("/{id}")
-    public void delete(@PathVariable Long id) {
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.delete(id);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/client/{clientId}")
