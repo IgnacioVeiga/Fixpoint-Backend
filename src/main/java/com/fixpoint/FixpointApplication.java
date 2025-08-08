@@ -10,7 +10,7 @@ public class FixpointApplication {
 		try {
 			SpringApplication.run(FixpointApplication.class, args);
 		} catch (Throwable ex) {
-			com.fixpoint.components.ApplicationErrorHandler.handle(ex);
+			com.fixpoint.exceptions.ApplicationErrorHandler.handle(ex);
 			throw ex;
 		}
 	}
