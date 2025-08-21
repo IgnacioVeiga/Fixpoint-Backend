@@ -7,17 +7,24 @@ import com.fixpoint.business.tickets.entity.Ticket;
 import com.fixpoint.business.tickets.repository.TicketRepository;
 import com.fixpoint.business.tickets.service.TicketServiceImpl;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
 public class AttachmentServiceImpl implements AttachmentService {
 
+    private static final String ATTACHMENT_NOT_FOUND = "Attachment not found";
+    public static final String ORIGINAL_FILENAME_MUST_NOT_BE_NULL = "Original filename must not be null";
+
     private final AttachmentRepository attachmentRepo;
     private final TicketRepository ticketRepo;
+    private final FileStorageService fileStorageService;
     private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     @Override
@@ -34,7 +41,7 @@ public class AttachmentServiceImpl implements AttachmentService {
     public AttachmentDTO findById(Long id) {
         return attachmentRepo.findById(id)
                 .map(this::toDto)
-                .orElseThrow(() -> new RuntimeException("Attachment not found"));
+                .orElseThrow(() -> new RuntimeException(ATTACHMENT_NOT_FOUND));
     }
 
     @Override
@@ -53,18 +60,66 @@ public class AttachmentServiceImpl implements AttachmentService {
     }
 
     @Override
-    public void delete(Long id) {
-        attachmentRepo.deleteById(id);
+    public AttachmentDTO uploadFile(Long ticketId, MultipartFile file, String fileType) {
+        Ticket ticket = ticketRepo.findById(ticketId)
+                .orElseThrow(() -> new RuntimeException(TicketServiceImpl.TICKET_NOT_FOUND));
+
+        String originalFilename = Objects.requireNonNull(file.getOriginalFilename(), ORIGINAL_FILENAME_MUST_NOT_BE_NULL);
+        String storedFileName = fileStorageService.storeFile(file);
+
+        Attachment attachment = Attachment.builder()
+                .ticket(ticket)
+                .filename(originalFilename)
+                .filepath(storedFileName)
+                .fileType(fileType)
+                .build();
+
+        return toDto(attachmentRepo.save(attachment));
     }
 
-    private AttachmentDTO toDto(Attachment a) {
+    @Override
+    public Resource downloadFile(Long id) {
+        Attachment attachment = attachmentRepo.findById(id)
+                .orElseThrow(() -> new RuntimeException(ATTACHMENT_NOT_FOUND));
+        return fileStorageService.loadFileAsResource(attachment.getFilepath());
+    }
+
+    @Override
+    public void delete(Long id) {
+        Attachment attachment = attachmentRepo.findById(id)
+                .orElseThrow(() -> new RuntimeException(ATTACHMENT_NOT_FOUND));
+
+        fileStorageService.deleteFile(attachment.getFilepath());
+        attachmentRepo.delete(attachment);
+    }
+
+    @Override
+    public AttachmentDTO replaceFile(Long id, MultipartFile file) {
+        Attachment attachment = attachmentRepo.findById(id)
+                .orElseThrow(() -> new RuntimeException(ATTACHMENT_NOT_FOUND));
+
+        // Delete old file
+        fileStorageService.deleteFile(attachment.getFilepath());
+
+        // Store new file
+        String originalFilename = Objects.requireNonNull(file.getOriginalFilename(), ORIGINAL_FILENAME_MUST_NOT_BE_NULL);
+        String storedFileName = fileStorageService.storeFile(file);
+
+        // Update attachment
+        attachment.setFilename(originalFilename);
+        attachment.setFilepath(storedFileName);
+
+        return toDto(attachmentRepo.save(attachment));
+    }
+
+    private AttachmentDTO toDto(Attachment attachment) {
         return AttachmentDTO.builder()
-                .id(a.getId())
-                .ticketId(a.getTicket().getId())
-                .filename(a.getFilename())
-                .filepath(a.getFilepath())
-                .fileType(a.getFileType())
-                .uploadedAt(a.getUploadedAt().format(formatter))
+                .id(attachment.getId())
+                .ticketId(attachment.getTicket().getId())
+                .filename(attachment.getFilename())
+                .filepath(attachment.getFilepath())
+                .fileType(attachment.getFileType())
+                .uploadedAt(attachment.getUploadedAt().format(formatter))
                 .build();
     }
 }
