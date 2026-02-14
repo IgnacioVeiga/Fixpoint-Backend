@@ -2,6 +2,7 @@ package com.fixpoint.integration;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fixpoint.business.attachments.repository.AttachmentRepository;
 import com.fixpoint.business.clients.repository.ClientRepository;
 import com.fixpoint.business.inventory.repository.InventoryRepository;
 import com.fixpoint.business.ticketparts.repository.TicketPartRepository;
@@ -11,20 +12,31 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Comparator;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 class ApiIntegrationTest {
+    private static final Path TEST_UPLOAD_DIR = Path.of("target", "test-uploads");
 
     @Autowired
     private MockMvc mockMvc;
@@ -44,12 +56,17 @@ class ApiIntegrationTest {
     @Autowired
     private ClientRepository clientRepository;
 
+    @Autowired
+    private AttachmentRepository attachmentRepository;
+
     @BeforeEach
     void cleanDatabase() {
+        attachmentRepository.deleteAll();
         ticketPartRepository.deleteAll();
         ticketRepository.deleteAll();
         inventoryRepository.deleteAll();
         clientRepository.deleteAll();
+        cleanUploadDirectory();
     }
 
     @Test
@@ -130,6 +147,48 @@ class ApiIntegrationTest {
                 .andExpect(jsonPath("$.message").value("Ticket not found"));
     }
 
+    @Test
+    void shouldUploadListDownloadAndDeleteAttachment() throws Exception {
+        long clientId = createClient("Diana");
+        long ticketId = createTicket(clientId);
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "diagnostic-note.txt",
+                MediaType.TEXT_PLAIN_VALUE,
+                "diagnostic-content".getBytes()
+        );
+
+        MvcResult uploadResult = mockMvc.perform(multipart("/api/attachments/upload/ticket/{ticketId}", ticketId)
+                        .file(file)
+                        .param("fileType", "other"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").isNumber())
+                .andExpect(jsonPath("$.ticketId").value(ticketId))
+                .andExpect(jsonPath("$.filename").value("diagnostic-note.txt"))
+                .andExpect(jsonPath("$.fileType").value("other"))
+                .andReturn();
+
+        long attachmentId = readId(uploadResult);
+
+        mockMvc.perform(get("/api/attachments/ticket/{ticketId}", ticketId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(attachmentId))
+                .andExpect(jsonPath("$[0].filename").value("diagnostic-note.txt"));
+
+        mockMvc.perform(get("/api/attachments/download/{id}", attachmentId))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, containsString("diagnostic-note.txt")))
+                .andExpect(content().bytes("diagnostic-content".getBytes()));
+
+        mockMvc.perform(delete("/api/attachments/{id}", attachmentId))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/attachments/{id}", attachmentId))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Attachment not found"));
+    }
+
     private long createClient(String name) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/clients")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -199,5 +258,26 @@ class ApiIntegrationTest {
     private long readId(MvcResult result) throws Exception {
         JsonNode root = objectMapper.readTree(result.getResponse().getContentAsString());
         return root.path("id").asLong();
+    }
+
+    private void cleanUploadDirectory() {
+        if (!Files.exists(TEST_UPLOAD_DIR)) {
+            return;
+        }
+
+        try {
+            Files.walk(TEST_UPLOAD_DIR)
+                    .sorted(Comparator.reverseOrder())
+                    .forEach(path -> {
+                        try {
+                            Files.deleteIfExists(path);
+                        } catch (IOException ex) {
+                            throw new IllegalStateException("Failed to clean test upload directory", ex);
+                        }
+                    });
+            Files.createDirectories(TEST_UPLOAD_DIR);
+        } catch (IOException ex) {
+            throw new IllegalStateException("Failed to clean test upload directory", ex);
+        }
     }
 }

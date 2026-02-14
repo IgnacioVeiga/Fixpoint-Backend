@@ -60,3 +60,7 @@ Cada una levanta `com.fixpoint.FixpointApplication` usando su archivo `.env.*`.
 ## CI
 
 GitHub Actions workflow: `.github/workflows/ci.yml` runs tests and package build only on commits to `main`.
+
+## Branch protection
+
+Use `BRANCH_PROTECTION_CHECKLIST.md` before enabling/adjusting rules for `main`.
