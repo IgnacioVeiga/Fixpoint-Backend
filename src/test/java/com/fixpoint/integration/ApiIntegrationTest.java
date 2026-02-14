@@ -28,6 +28,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -148,6 +149,45 @@ class ApiIntegrationTest {
     }
 
     @Test
+    void shouldRejectInvalidTicketStatusTransition() throws Exception {
+        long clientId = createClient("Erica");
+        long ticketId = createTicket(clientId);
+
+        mockMvc.perform(put("/api/tickets/{id}", ticketId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "clientId": %d,
+                                  "deviceType": "Phone",
+                                  "entryDate": "2026-02-14",
+                                  "problemDescription": "Broken button",
+                                  "status": "repaired",
+                                  "needsContract": false,
+                                  "contractSigned": false
+                                }
+                                """.formatted(clientId)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message", containsString("Invalid ticket status transition")));
+    }
+
+    @Test
+    void shouldRejectLogCreationForClosedTicket() throws Exception {
+        long clientId = createClient("Frank");
+        long ticketId = createTicket(clientId, "returned");
+
+        mockMvc.perform(post("/api/tickets/{ticketId}/logs", ticketId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "description": "Final review note",
+                                  "author": "tech"
+                                }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Cannot add logs to a closed ticket"));
+    }
+
+    @Test
     void shouldUploadListDownloadAndDeleteAttachment() throws Exception {
         long clientId = createClient("Diana");
         long ticketId = createTicket(clientId);
@@ -205,6 +245,10 @@ class ApiIntegrationTest {
     }
 
     private long createTicket(long clientId) throws Exception {
+        return createTicket(clientId, "diagnosing");
+    }
+
+    private long createTicket(long clientId, String status) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/tickets")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -213,11 +257,11 @@ class ApiIntegrationTest {
                                   "deviceType": "Phone",
                                   "entryDate": "2026-02-14",
                                   "problemDescription": "Broken button",
-                                  "status": "diagnosing",
+                                  "status": "%s",
                                   "needsContract": false,
                                   "contractSigned": false
                                 }
-                                """.formatted(clientId)))
+                                """.formatted(clientId, status)))
                 .andExpect(status().isOk())
                 .andReturn();
 

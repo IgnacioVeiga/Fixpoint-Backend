@@ -2,6 +2,7 @@ package com.fixpoint.business.tickets.service;
 
 import com.fixpoint.business.clients.repository.ClientRepository;
 import com.fixpoint.business.clients.service.ClientServiceImpl;
+import com.fixpoint.business.tickets.domain.TicketStatus;
 import com.fixpoint.business.tickets.entity.Ticket;
 import com.fixpoint.business.tickets.dto.CreateTicketDTO;
 import com.fixpoint.business.tickets.dto.TicketDTO;
@@ -39,6 +40,9 @@ public class TicketServiceImpl implements TicketService {
         var client = clientRepository.findById(dto.clientId())
                 .orElseThrow(() -> new EntityNotFoundException(ClientServiceImpl.CLIENT_NOT_FOUND));
 
+        TicketStatus status = TicketStatus.parseOrDefault(dto.status(), TicketStatus.RECEIVED);
+        validateContractConsistency(dto.needsContract(), dto.contractSigned(), status);
+
         Ticket ticket = Ticket.builder()
                 .client(client)
                 .deviceType(dto.deviceType())
@@ -47,7 +51,7 @@ public class TicketServiceImpl implements TicketService {
                 .serialNumber(dto.serialNumber())
                 .entryDate(dto.entryDate() != null ? dto.entryDate() : LocalDate.now())
                 .problemDescription(dto.problemDescription())
-                .status(dto.status() != null ? dto.status() : "received")
+                .status(status.value())
                 .needsContract(dto.needsContract())
                 .contractSigned(dto.contractSigned())
                 .createdBy(dto.createdBy())
@@ -65,6 +69,11 @@ public class TicketServiceImpl implements TicketService {
         var client = clientRepository.findById(dto.clientId())
                 .orElseThrow(() -> new EntityNotFoundException(ClientServiceImpl.CLIENT_NOT_FOUND));
 
+        TicketStatus currentStatus = TicketStatus.parse(ticket.getStatus());
+        TicketStatus nextStatus = TicketStatus.parseOrDefault(dto.status(), currentStatus);
+        validateStatusTransition(currentStatus, nextStatus);
+        validateContractConsistency(dto.needsContract(), dto.contractSigned(), nextStatus);
+
         ticket.setClient(client);
         ticket.setDeviceType(dto.deviceType());
         ticket.setBrand(dto.brand());
@@ -72,7 +81,7 @@ public class TicketServiceImpl implements TicketService {
         ticket.setSerialNumber(dto.serialNumber());
         ticket.setEntryDate(dto.entryDate() != null ? dto.entryDate() : ticket.getEntryDate());
         ticket.setProblemDescription(dto.problemDescription());
-        ticket.setStatus(dto.status() != null ? dto.status() : ticket.getStatus());
+        ticket.setStatus(nextStatus.value());
         ticket.setNeedsContract(dto.needsContract());
         ticket.setContractSigned(dto.contractSigned());
         ticket.setCreatedBy(dto.createdBy());
@@ -96,7 +105,25 @@ public class TicketServiceImpl implements TicketService {
 
     @Override
     public List<TicketDTO> getByStatus(String status) {
-        return ticketRepository.findByStatus(status).stream().map(this::toDTO).toList();
+        TicketStatus parsedStatus = TicketStatus.parse(status);
+        return ticketRepository.findByStatus(parsedStatus.value()).stream().map(this::toDTO).toList();
+    }
+
+    private void validateStatusTransition(TicketStatus currentStatus, TicketStatus nextStatus) {
+        if (!currentStatus.canTransitionTo(nextStatus)) {
+            throw new IllegalStateException("Invalid ticket status transition from '" +
+                    currentStatus.value() + "' to '" + nextStatus.value() + "'");
+        }
+    }
+
+    private void validateContractConsistency(boolean needsContract, boolean contractSigned, TicketStatus status) {
+        if (!needsContract && contractSigned) {
+            throw new IllegalArgumentException("contractSigned requires needsContract=true");
+        }
+
+        if (status == TicketStatus.RETURNED && needsContract && !contractSigned) {
+            throw new IllegalStateException("Cannot mark ticket as returned without signed contract");
+        }
     }
 
     private TicketDTO toDTO(Ticket t) {
