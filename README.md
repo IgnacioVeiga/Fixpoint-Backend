@@ -49,3 +49,9 @@ Cada una levanta `com.fixpoint.FixpointApplication` usando su archivo `.env.*`.
 ./mvnw test
 ./mvnw -DskipTests package
 ```
+
+## Unit tests included
+
+- `TicketPartServiceTest`: stock validation and DTO mapping.
+- `InventoryServiceImplTest`: delete guard when inventory is linked to ticket parts.
+- `GlobalExceptionHandlerTest`: HTTP status and response payload mapping.
