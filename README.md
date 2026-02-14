@@ -54,6 +54,20 @@ Cada una levanta `com.fixpoint.FixpointApplication` usando su archivo `.env.*`.
 - `POST /api/auth/register`: available only in `dev` profile.
 - Production user provisioning is handled by Flyway SQL (`src/main/resources/db/migration/prod/V0_3__Bootstrap_prod_users.sql`).
 
+## Flyway migration layout
+
+- `src/main/resources/db/migration/common`: shared schema/data migrations for every environment.
+- `src/main/resources/db/migration/dev`: dev-only migrations.
+- `src/main/resources/db/migration/qa`: QA-only migrations.
+- `src/main/resources/db/migration/prod`: prod-only migrations.
+
+Active locations by profile:
+
+- `dev`: `common + dev`
+- `qa`: `common + qa`
+- `prod`: `common + prod`
+- `mock`: Flyway disabled
+
 ## Dev Profile with Cloud PostgreSQL
 
 Minimum required environment variables for `dev`:
