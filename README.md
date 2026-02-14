@@ -55,7 +55,8 @@ Cada una levanta `com.fixpoint.FixpointApplication` usando su archivo `.env.*`.
 - `TicketPartServiceTest`: stock validation and DTO mapping.
 - `InventoryServiceImplTest`: delete guard when inventory is linked to ticket parts.
 - `GlobalExceptionHandlerTest`: HTTP status and response payload mapping.
+- `ApiIntegrationTest`: MockMvc integration tests for tickets, inventory, ticket parts, and global error mapping.
 
 ## CI
 
-GitHub Actions workflow: `.github/workflows/ci.yml` runs tests and package build on push/PR.
+GitHub Actions workflow: `.github/workflows/ci.yml` runs tests and package build only on commits to `main`.
