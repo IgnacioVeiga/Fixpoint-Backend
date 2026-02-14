@@ -95,6 +95,20 @@ class ApiIntegrationTest {
     }
 
     @Test
+    void shouldExposeTicketStatusDefinitions() throws Exception {
+        mockMvc.perform(get("/api/tickets/statuses"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(7))
+                .andExpect(jsonPath("$[0].value").value("received"))
+                .andExpect(jsonPath("$[0].closed").value(false))
+                .andExpect(jsonPath("$[0].nextStatuses[0]").value("diagnosing"))
+                .andExpect(jsonPath("$[0].nextStatuses[1]").value("cancelled"))
+                .andExpect(jsonPath("$[5].value").value("returned"))
+                .andExpect(jsonPath("$[5].closed").value(true))
+                .andExpect(jsonPath("$[5].nextStatuses").isEmpty());
+    }
+
+    @Test
     void shouldReturnBadRequestWhenInventoryQuantityIsInvalid() throws Exception {
         mockMvc.perform(post("/api/inventory")
                         .contentType(MediaType.APPLICATION_JSON)

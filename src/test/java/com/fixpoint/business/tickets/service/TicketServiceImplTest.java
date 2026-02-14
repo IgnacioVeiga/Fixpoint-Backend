@@ -19,6 +19,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -199,5 +200,26 @@ class TicketServiceImplTest {
         assertEquals(1, result.size());
         assertEquals("diagnosing", result.getFirst().status());
         verify(ticketRepository).findByStatus("diagnosing");
+    }
+
+    @Test
+    void getStatusDefinitionsShouldExposeWorkflowForFrontend() {
+        var definitions = service.getStatusDefinitions();
+
+        assertEquals(7, definitions.size());
+
+        var received = definitions.stream()
+                .filter(item -> item.value().equals("received"))
+                .findFirst()
+                .orElseThrow();
+        assertTrue(received.nextStatuses().contains("diagnosing"));
+        assertTrue(received.nextStatuses().contains("cancelled"));
+
+        var returned = definitions.stream()
+                .filter(item -> item.value().equals("returned"))
+                .findFirst()
+                .orElseThrow();
+        assertTrue(returned.closed());
+        assertTrue(returned.nextStatuses().isEmpty());
     }
 }

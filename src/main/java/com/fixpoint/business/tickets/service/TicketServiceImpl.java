@@ -6,6 +6,7 @@ import com.fixpoint.business.tickets.domain.TicketStatus;
 import com.fixpoint.business.tickets.entity.Ticket;
 import com.fixpoint.business.tickets.dto.CreateTicketDTO;
 import com.fixpoint.business.tickets.dto.TicketDTO;
+import com.fixpoint.business.tickets.dto.TicketStatusDefinitionDTO;
 import com.fixpoint.business.tickets.repository.TicketRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 
 @Service
@@ -107,6 +109,17 @@ public class TicketServiceImpl implements TicketService {
     public List<TicketDTO> getByStatus(String status) {
         TicketStatus parsedStatus = TicketStatus.parse(status);
         return ticketRepository.findByStatus(parsedStatus.value()).stream().map(this::toDTO).toList();
+    }
+
+    @Override
+    public List<TicketStatusDefinitionDTO> getStatusDefinitions() {
+        return Arrays.stream(TicketStatus.values())
+                .map(status -> new TicketStatusDefinitionDTO(
+                        status.value(),
+                        status.isClosed(),
+                        status.nextStatuses()
+                ))
+                .toList();
     }
 
     private void validateStatusTransition(TicketStatus currentStatus, TicketStatus nextStatus) {

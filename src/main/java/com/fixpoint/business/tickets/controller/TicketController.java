@@ -2,6 +2,7 @@ package com.fixpoint.business.tickets.controller;
 
 import com.fixpoint.business.tickets.dto.CreateTicketDTO;
 import com.fixpoint.business.tickets.dto.TicketDTO;
+import com.fixpoint.business.tickets.dto.TicketStatusDefinitionDTO;
 import com.fixpoint.business.tickets.service.TicketService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -51,5 +52,10 @@ public class TicketController {
     @GetMapping("/status")
     public List<TicketDTO> getByStatus(@RequestParam String status) {
         return service.getByStatus(status);
+    }
+
+    @GetMapping("/statuses")
+    public List<TicketStatusDefinitionDTO> getStatuses() {
+        return service.getStatusDefinitions();
     }
 }

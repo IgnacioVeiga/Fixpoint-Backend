@@ -1,6 +1,7 @@
 package com.fixpoint.business.tickets.domain;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
 
@@ -40,6 +41,13 @@ public enum TicketStatus {
             case REPAIRED -> target == RETURNED || target == CANCELLED;
             case RETURNED, CANCELLED -> false;
         };
+    }
+
+    public List<String> nextStatuses() {
+        return Arrays.stream(values())
+                .filter(target -> this != target && canTransitionTo(target))
+                .map(TicketStatus::value)
+                .toList();
     }
 
     public static TicketStatus parse(String rawStatus) {
