@@ -5,10 +5,13 @@
 -- DB: PostgreSQL
 -- =============================================================
 
+CREATE SCHEMA IF NOT EXISTS public;
+SET search_path TO public;
+
 -- =====================
 -- Clientes del sistema
 -- =====================
-CREATE TABLE clients (
+CREATE TABLE IF NOT EXISTS clients (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
     dni VARCHAR(20),
@@ -22,7 +25,7 @@ CREATE TABLE clients (
 -- ========================================
 -- Tickets de reparación asociados a clientes
 -- ========================================
-CREATE TABLE tickets (
+CREATE TABLE IF NOT EXISTS tickets (
     id SERIAL PRIMARY KEY,
     client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
     device_type TEXT NOT NULL,         -- ej: "televisor", "celular", etc.
@@ -41,7 +44,7 @@ CREATE TABLE tickets (
 -- =====================================================
 -- Registro de eventos o actualizaciones por cada ticket
 -- =====================================================
-CREATE TABLE ticket_logs (
+CREATE TABLE IF NOT EXISTS ticket_logs (
     id SERIAL PRIMARY KEY,
     ticket_id INTEGER NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
     timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -52,7 +55,7 @@ CREATE TABLE ticket_logs (
 -- ======================================
 -- Archivos adjuntos relacionados a tickets (fotos, PDFs, etc.)
 -- ======================================
-CREATE TABLE attachments (
+CREATE TABLE IF NOT EXISTS attachments (
     id SERIAL PRIMARY KEY,
     ticket_id INTEGER NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
     filename TEXT NOT NULL,
@@ -64,7 +67,7 @@ CREATE TABLE attachments (
 -- ======================================
 -- Inventario del taller (componentes y piezas)
 -- ======================================
-CREATE TABLE inventory (
+CREATE TABLE IF NOT EXISTS inventory (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
     component_type TEXT,         -- ej: capacitor, display, board, cable
@@ -79,7 +82,7 @@ CREATE TABLE inventory (
 -- ===================================================
 -- Relación entre tickets y componentes del inventario utilizados
 -- ===================================================
-CREATE TABLE ticket_parts (
+CREATE TABLE IF NOT EXISTS ticket_parts (
     id SERIAL PRIMARY KEY,
     ticket_id INTEGER NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
     inventory_id INTEGER NOT NULL REFERENCES inventory(id),
@@ -90,11 +93,11 @@ CREATE TABLE ticket_parts (
 -- ======================================
 -- Indices útiles para búsquedas frecuentes
 -- ======================================
-CREATE INDEX idx_tickets_client ON tickets(client_id);
-CREATE INDEX idx_ticket_logs_ticket ON ticket_logs(ticket_id);
-CREATE INDEX idx_attachments_ticket ON attachments(ticket_id);
-CREATE INDEX idx_ticket_parts_ticket ON ticket_parts(ticket_id);
-CREATE INDEX idx_ticket_parts_inventory ON ticket_parts(inventory_id);
+CREATE INDEX IF NOT EXISTS idx_tickets_client ON tickets(client_id);
+CREATE INDEX IF NOT EXISTS idx_ticket_logs_ticket ON ticket_logs(ticket_id);
+CREATE INDEX IF NOT EXISTS idx_attachments_ticket ON attachments(ticket_id);
+CREATE INDEX IF NOT EXISTS idx_ticket_parts_ticket ON ticket_parts(ticket_id);
+CREATE INDEX IF NOT EXISTS idx_ticket_parts_inventory ON ticket_parts(inventory_id);
 
 -- ======================================
 -- Comentarios finales:

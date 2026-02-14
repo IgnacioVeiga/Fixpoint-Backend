@@ -4,6 +4,8 @@
 -- AUTH_BOOTSTRAP_ADMIN_PASSWORD_HASH
 -- AUTH_BOOTSTRAP_ADMIN_ROLE (ADMIN or TECH)
 
+SET search_path TO public;
+
 INSERT INTO app_users (username, password_hash, role, enabled, created_at)
 SELECT
     '${bootstrap_admin_username}',

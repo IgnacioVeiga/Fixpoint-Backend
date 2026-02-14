@@ -68,6 +68,11 @@ Active locations by profile:
 - `prod`: `common + prod`
 - `mock`: Flyway disabled
 
+Bootstrap behavior for empty databases:
+
+- Flyway is configured to create schema `public` automatically (`spring.flyway.create-schemas=true`).
+- Base schema/tables are created from `common` migrations without assuming pre-existing schemas.
+
 ## Dev Profile with Cloud PostgreSQL
 
 Minimum required environment variables for `dev`:

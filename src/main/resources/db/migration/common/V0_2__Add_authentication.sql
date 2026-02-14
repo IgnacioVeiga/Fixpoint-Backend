@@ -3,7 +3,9 @@
 -- - DEV: POST /api/auth/register
 -- - QA/PROD: dedicated Flyway SQL scripts with BCrypt hashes.
 
-CREATE TABLE app_users (
+SET search_path TO public;
+
+CREATE TABLE IF NOT EXISTS app_users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(100) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
