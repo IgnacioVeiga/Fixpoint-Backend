@@ -1,7 +1,10 @@
 package com.fixpoint.business.tickets.service;
 
+import com.fixpoint.business.attachments.repository.AttachmentRepository;
 import com.fixpoint.business.clients.repository.ClientRepository;
 import com.fixpoint.business.clients.service.ClientServiceImpl;
+import com.fixpoint.business.ticketlogs.repository.TicketLogRepository;
+import com.fixpoint.business.ticketparts.repository.TicketPartRepository;
 import com.fixpoint.business.tickets.domain.TicketStatus;
 import com.fixpoint.business.tickets.entity.Ticket;
 import com.fixpoint.business.tickets.dto.CreateTicketDTO;
@@ -22,8 +25,13 @@ import java.util.List;
 public class TicketServiceImpl implements TicketService {
 
     public static final String TICKET_NOT_FOUND = "Ticket not found";
+    public static final String CLOSED_TICKETS_CANNOT_BE_DELETED = "Closed tickets cannot be deleted";
+    public static final String CANNOT_DELETE_TICKET_WITH_RELATED_DATA = "Cannot delete ticket with related parts, logs, or attachments";
     private final TicketRepository ticketRepository;
     private final ClientRepository clientRepository;
+    private final TicketPartRepository ticketPartRepository;
+    private final TicketLogRepository ticketLogRepository;
+    private final AttachmentRepository attachmentRepository;
 
     @Override
     public List<TicketDTO> getAll() {
@@ -72,6 +80,10 @@ public class TicketServiceImpl implements TicketService {
                 .orElseThrow(() -> new EntityNotFoundException(ClientServiceImpl.CLIENT_NOT_FOUND));
 
         TicketStatus currentStatus = TicketStatus.parse(ticket.getStatus());
+        if (currentStatus.isClosed()) {
+            throw new IllegalStateException("Closed tickets cannot be edited");
+        }
+
         TicketStatus nextStatus = TicketStatus.parseOrDefault(dto.status(), currentStatus);
         validateStatusTransition(currentStatus, nextStatus);
         validateContractConsistency(dto.needsContract(), dto.contractSigned(), nextStatus);
@@ -94,9 +106,20 @@ public class TicketServiceImpl implements TicketService {
 
     @Override
     public void delete(Long id) {
-        if (!ticketRepository.existsById(id)) {
-            throw new EntityNotFoundException(TICKET_NOT_FOUND);
+        Ticket ticket = ticketRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException(TICKET_NOT_FOUND));
+
+        TicketStatus currentStatus = TicketStatus.parse(ticket.getStatus());
+        if (currentStatus.isClosed()) {
+            throw new IllegalStateException(CLOSED_TICKETS_CANNOT_BE_DELETED);
         }
+
+        if (ticketPartRepository.existsByTicketId(id)
+                || ticketLogRepository.existsByTicketId(id)
+                || attachmentRepository.existsByTicketId(id)) {
+            throw new IllegalStateException(CANNOT_DELETE_TICKET_WITH_RELATED_DATA);
+        }
+
         ticketRepository.deleteById(id);
     }
 

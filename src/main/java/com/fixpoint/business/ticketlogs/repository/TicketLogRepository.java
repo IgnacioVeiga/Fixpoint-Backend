@@ -7,4 +7,5 @@ import java.util.List;
 
 public interface TicketLogRepository extends JpaRepository<TicketLog, Long> {
     List<TicketLog> findByTicketIdOrderByTimestampDesc(Long ticketId);
+    boolean existsByTicketId(Long ticketId);
 }

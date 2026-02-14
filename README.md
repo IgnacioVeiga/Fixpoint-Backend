@@ -24,6 +24,11 @@ Base común (`application.properties`):
 - `CORS_ALLOWED_ORIGINS`
 - `FILE_UPLOAD_DIR`
 - `APP_TIMEZONE`
+- `JWT_SECRET`
+- `JWT_EXPIRATION_SECONDS`
+- `AUTH_BOOTSTRAP_ADMIN_USERNAME` (prod only)
+- `AUTH_BOOTSTRAP_ADMIN_PASSWORD_HASH` (prod only)
+- `AUTH_BOOTSTRAP_ADMIN_ROLE` (prod only, `ADMIN`/`TECH`)
 
 Plantillas por entorno para IntelliJ:
 
@@ -42,6 +47,12 @@ Hay run configurations compartidas en `.run/`:
 - `Backend - Mock`
 
 Cada una levanta `com.fixpoint.FixpointApplication` usando su archivo `.env.*`.
+
+## Authentication flow
+
+- `POST /api/auth/login`: available in all environments.
+- `POST /api/auth/register`: available only in `dev` profile.
+- Production user provisioning is handled by Flyway SQL (`src/main/resources/db/migration/prod/V0_3__Bootstrap_prod_users.sql`).
 
 ## Comandos
 

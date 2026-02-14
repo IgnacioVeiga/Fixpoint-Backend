@@ -1,7 +1,10 @@
 package com.fixpoint.business.tickets.service;
 
+import com.fixpoint.business.attachments.repository.AttachmentRepository;
 import com.fixpoint.business.clients.entity.Client;
 import com.fixpoint.business.clients.repository.ClientRepository;
+import com.fixpoint.business.ticketlogs.repository.TicketLogRepository;
+import com.fixpoint.business.ticketparts.repository.TicketPartRepository;
 import com.fixpoint.business.tickets.dto.CreateTicketDTO;
 import com.fixpoint.business.tickets.dto.TicketDTO;
 import com.fixpoint.business.tickets.entity.Ticket;
@@ -33,6 +36,15 @@ class TicketServiceImplTest {
 
     @Mock
     private ClientRepository clientRepository;
+
+    @Mock
+    private TicketPartRepository ticketPartRepository;
+
+    @Mock
+    private TicketLogRepository ticketLogRepository;
+
+    @Mock
+    private AttachmentRepository attachmentRepository;
 
     @InjectMocks
     private TicketServiceImpl service;
@@ -136,6 +148,42 @@ class TicketServiceImplTest {
     }
 
     @Test
+    void updateShouldRejectClosedTickets() {
+        Client client = Client.builder().id(1L).name("Alice").build();
+        Ticket existing = Ticket.builder()
+                .id(101L)
+                .client(client)
+                .deviceType("Laptop")
+                .entryDate(LocalDate.of(2026, 2, 14))
+                .status("returned")
+                .needsContract(false)
+                .contractSigned(false)
+                .lastUpdated(LocalDateTime.of(2026, 2, 14, 10, 0))
+                .build();
+
+        when(ticketRepository.findById(101L)).thenReturn(Optional.of(existing));
+        when(clientRepository.findById(1L)).thenReturn(Optional.of(client));
+
+        CreateTicketDTO dto = new CreateTicketDTO(
+                1L,
+                "Laptop",
+                null,
+                null,
+                null,
+                LocalDate.of(2026, 2, 14),
+                "Should not update",
+                "returned",
+                false,
+                false,
+                "tech"
+        );
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> service.update(101L, dto));
+
+        assertEquals("Closed tickets cannot be edited", ex.getMessage());
+    }
+
+    @Test
     void updateShouldAllowValidTransition() {
         Client client = Client.builder().id(1L).name("Alice").build();
         Ticket existing = Ticket.builder()
@@ -221,5 +269,68 @@ class TicketServiceImplTest {
                 .orElseThrow();
         assertTrue(returned.closed());
         assertTrue(returned.nextStatuses().isEmpty());
+    }
+
+    @Test
+    void deleteShouldRejectClosedTickets() {
+        Client client = Client.builder().id(1L).name("Alice").build();
+        Ticket closedTicket = Ticket.builder()
+                .id(220L)
+                .client(client)
+                .deviceType("Laptop")
+                .entryDate(LocalDate.of(2026, 2, 14))
+                .status("returned")
+                .lastUpdated(LocalDateTime.of(2026, 2, 14, 12, 0))
+                .build();
+
+        when(ticketRepository.findById(220L)).thenReturn(Optional.of(closedTicket));
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> service.delete(220L));
+
+        assertEquals("Closed tickets cannot be deleted", ex.getMessage());
+        verify(ticketRepository, never()).deleteById(220L);
+    }
+
+    @Test
+    void deleteShouldRejectTicketsWithRelatedData() {
+        Client client = Client.builder().id(1L).name("Alice").build();
+        Ticket openTicket = Ticket.builder()
+                .id(221L)
+                .client(client)
+                .deviceType("Laptop")
+                .entryDate(LocalDate.of(2026, 2, 14))
+                .status("diagnosing")
+                .lastUpdated(LocalDateTime.of(2026, 2, 14, 12, 0))
+                .build();
+
+        when(ticketRepository.findById(221L)).thenReturn(Optional.of(openTicket));
+        when(ticketPartRepository.existsByTicketId(221L)).thenReturn(true);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> service.delete(221L));
+
+        assertEquals("Cannot delete ticket with related parts, logs, or attachments", ex.getMessage());
+        verify(ticketRepository, never()).deleteById(221L);
+    }
+
+    @Test
+    void deleteShouldRemoveOpenTicketWithoutRelatedData() {
+        Client client = Client.builder().id(1L).name("Alice").build();
+        Ticket openTicket = Ticket.builder()
+                .id(222L)
+                .client(client)
+                .deviceType("Laptop")
+                .entryDate(LocalDate.of(2026, 2, 14))
+                .status("diagnosing")
+                .lastUpdated(LocalDateTime.of(2026, 2, 14, 12, 0))
+                .build();
+
+        when(ticketRepository.findById(222L)).thenReturn(Optional.of(openTicket));
+        when(ticketPartRepository.existsByTicketId(222L)).thenReturn(false);
+        when(ticketLogRepository.existsByTicketId(222L)).thenReturn(false);
+        when(attachmentRepository.existsByTicketId(222L)).thenReturn(false);
+
+        service.delete(222L);
+
+        verify(ticketRepository).deleteById(222L);
     }
 }

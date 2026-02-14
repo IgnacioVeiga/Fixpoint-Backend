@@ -3,8 +3,10 @@ package com.fixpoint.exceptions;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.OffsetDateTime;
 import java.util.Map;
@@ -51,6 +53,16 @@ class GlobalExceptionHandlerTest {
 
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
         assertBody(response.getBody(), 500, "Internal Server Error", "Unexpected server error");
+    }
+
+    @Test
+    void handleNoResourceFoundShouldReturn404Response() {
+        ResponseEntity<Map<String, Object>> response = handler.handleNoResourceFound(
+                new NoResourceFoundException(HttpMethod.POST, "/api/auth/register")
+        );
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertBody(response.getBody(), 404, "Not Found", "Resource not found");
     }
 
     private void assertBody(Map<String, Object> body, int status, String error, String message) {

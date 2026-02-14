@@ -2,6 +2,7 @@ package com.fixpoint.integration;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fixpoint.auth.repository.AppUserRepository;
 import com.fixpoint.business.attachments.repository.AttachmentRepository;
 import com.fixpoint.business.clients.repository.ClientRepository;
 import com.fixpoint.business.inventory.repository.InventoryRepository;
@@ -15,6 +16,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -29,15 +31,17 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@ActiveProfiles("dev")
 class ApiIntegrationTest {
     private static final Path TEST_UPLOAD_DIR = Path.of("target", "test-uploads");
+    private static final String DEFAULT_PASSWORD = "integration-pass-2026";
 
     @Autowired
     private MockMvc mockMvc;
@@ -60,14 +64,81 @@ class ApiIntegrationTest {
     @Autowired
     private AttachmentRepository attachmentRepository;
 
+    @Autowired
+    private AppUserRepository appUserRepository;
+
+    private String authToken;
+
     @BeforeEach
-    void cleanDatabase() {
+    void cleanDatabase() throws Exception {
         attachmentRepository.deleteAll();
         ticketPartRepository.deleteAll();
         ticketRepository.deleteAll();
         inventoryRepository.deleteAll();
         clientRepository.deleteAll();
+        appUserRepository.deleteAll();
         cleanUploadDirectory();
+
+        String username = "dev-user-" + System.nanoTime();
+        registerUser(username, DEFAULT_PASSWORD);
+        authToken = loginUser(username, DEFAULT_PASSWORD);
+    }
+
+    @Test
+    void shouldRequireAuthenticationForProtectedEndpoints() throws Exception {
+        mockMvc.perform(get("/api/tickets"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Authentication required"));
+    }
+
+    @Test
+    void shouldRegisterAndLoginUserInDevProfile() throws Exception {
+        String username = "new-dev-user-" + System.nanoTime();
+
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "%s",
+                                  "password": "%s"
+                                }
+                                """.formatted(username, DEFAULT_PASSWORD)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.accessToken").isString())
+                .andExpect(jsonPath("$.username").value(username))
+                .andExpect(jsonPath("$.role").value("TECH"));
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "%s",
+                                  "password": "%s"
+                                }
+                                """.formatted(username, DEFAULT_PASSWORD)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.accessToken").isString())
+                .andExpect(jsonPath("$.username").value(username))
+                .andExpect(jsonPath("$.role").value("TECH"));
+    }
+
+    @Test
+    void shouldRejectInvalidLoginCredentials() throws Exception {
+        String username = "login-fail-" + System.nanoTime();
+        registerUser(username, DEFAULT_PASSWORD);
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "%s",
+                                  "password": "wrong-password"
+                                }
+                                """.formatted(username)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Invalid username or password"));
     }
 
     @Test
@@ -75,6 +146,7 @@ class ApiIntegrationTest {
         long clientId = createClient("Alice");
 
         mockMvc.perform(post("/api/tickets")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -96,7 +168,8 @@ class ApiIntegrationTest {
 
     @Test
     void shouldExposeTicketStatusDefinitions() throws Exception {
-        mockMvc.perform(get("/api/tickets/statuses"))
+        mockMvc.perform(get("/api/tickets/statuses")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(7))
                 .andExpect(jsonPath("$[0].value").value("received"))
@@ -111,6 +184,7 @@ class ApiIntegrationTest {
     @Test
     void shouldReturnBadRequestWhenInventoryQuantityIsInvalid() throws Exception {
         mockMvc.perform(post("/api/inventory")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -131,6 +205,7 @@ class ApiIntegrationTest {
         long inventoryId = createInventory("Battery X", 1);
 
         mockMvc.perform(post("/api/tickets/{ticketId}/parts", ticketId)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -150,14 +225,16 @@ class ApiIntegrationTest {
         long inventoryId = createInventory("Fan C", 4);
         addPart(ticketId, inventoryId, 1);
 
-        mockMvc.perform(delete("/api/inventory/{id}", inventoryId))
+        mockMvc.perform(delete("/api/inventory/{id}", inventoryId)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message", containsString("linked to ticket parts")));
     }
 
     @Test
     void shouldReturnNotFoundForMissingTicket() throws Exception {
-        mockMvc.perform(get("/api/tickets/{id}", 999999))
+        mockMvc.perform(get("/api/tickets/{id}", 999999)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("Ticket not found"));
     }
@@ -168,6 +245,7 @@ class ApiIntegrationTest {
         long ticketId = createTicket(clientId);
 
         mockMvc.perform(put("/api/tickets/{id}", ticketId)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -185,11 +263,59 @@ class ApiIntegrationTest {
     }
 
     @Test
+    void shouldRejectTicketUpdateWhenTicketIsClosed() throws Exception {
+        long clientId = createClient("Closed User");
+        long ticketId = createTicket(clientId, "returned");
+
+        mockMvc.perform(put("/api/tickets/{id}", ticketId)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "clientId": %d,
+                                  "deviceType": "Phone",
+                                  "entryDate": "2026-02-14",
+                                  "problemDescription": "Trying to edit closed ticket",
+                                  "status": "returned",
+                                  "needsContract": false,
+                                  "contractSigned": false
+                                }
+                                """.formatted(clientId)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Closed tickets cannot be edited"));
+    }
+
+    @Test
+    void shouldRejectTicketDeletionWhenTicketIsClosed() throws Exception {
+        long clientId = createClient("Closed Delete User");
+        long ticketId = createTicket(clientId, "returned");
+
+        mockMvc.perform(delete("/api/tickets/{id}", ticketId)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Closed tickets cannot be deleted"));
+    }
+
+    @Test
+    void shouldRejectTicketDeletionWhenTicketHasRelatedData() throws Exception {
+        long clientId = createClient("Linked Delete User");
+        long ticketId = createTicket(clientId, "diagnosing");
+        long inventoryId = createInventory("Delete rule item", 3);
+        addPart(ticketId, inventoryId, 1);
+
+        mockMvc.perform(delete("/api/tickets/{id}", ticketId)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Cannot delete ticket with related parts, logs, or attachments"));
+    }
+
+    @Test
     void shouldRejectLogCreationForClosedTicket() throws Exception {
         long clientId = createClient("Frank");
         long ticketId = createTicket(clientId, "returned");
 
         mockMvc.perform(post("/api/tickets/{ticketId}/logs", ticketId)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -199,6 +325,26 @@ class ApiIntegrationTest {
                                 """))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").value("Cannot add logs to a closed ticket"));
+    }
+
+    @Test
+    void shouldRejectAttachmentUploadForClosedTicket() throws Exception {
+        long clientId = createClient("Attachment Closed");
+        long ticketId = createTicket(clientId, "cancelled");
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "evidence.txt",
+                MediaType.TEXT_PLAIN_VALUE,
+                "evidence".getBytes()
+        );
+
+        mockMvc.perform(multipart("/api/attachments/upload/ticket/{ticketId}", ticketId)
+                        .file(file)
+                        .param("fileType", "other")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Cannot upload attachments for a closed ticket"));
     }
 
     @Test
@@ -215,7 +361,8 @@ class ApiIntegrationTest {
 
         MvcResult uploadResult = mockMvc.perform(multipart("/api/attachments/upload/ticket/{ticketId}", ticketId)
                         .file(file)
-                        .param("fileType", "other"))
+                        .param("fileType", "other")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").isNumber())
                 .andExpect(jsonPath("$.ticketId").value(ticketId))
@@ -225,26 +372,63 @@ class ApiIntegrationTest {
 
         long attachmentId = readId(uploadResult);
 
-        mockMvc.perform(get("/api/attachments/ticket/{ticketId}", ticketId))
+        mockMvc.perform(get("/api/attachments/ticket/{ticketId}", ticketId)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(attachmentId))
                 .andExpect(jsonPath("$[0].filename").value("diagnostic-note.txt"));
 
-        mockMvc.perform(get("/api/attachments/download/{id}", attachmentId))
+        mockMvc.perform(get("/api/attachments/download/{id}", attachmentId)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, containsString("diagnostic-note.txt")))
                 .andExpect(content().bytes("diagnostic-content".getBytes()));
 
-        mockMvc.perform(delete("/api/attachments/{id}", attachmentId))
+        mockMvc.perform(delete("/api/attachments/{id}", attachmentId)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
                 .andExpect(status().isNoContent());
 
-        mockMvc.perform(get("/api/attachments/{id}", attachmentId))
+        mockMvc.perform(get("/api/attachments/{id}", attachmentId)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("Attachment not found"));
     }
 
+    private String bearerToken() {
+        return "Bearer " + authToken;
+    }
+
+    private void registerUser(String username, String password) throws Exception {
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "%s",
+                                  "password": "%s"
+                                }
+                                """.formatted(username, password)))
+                .andExpect(status().isOk());
+    }
+
+    private String loginUser(String username, String password) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "%s",
+                                  "password": "%s"
+                                }
+                                """.formatted(username, password)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode root = objectMapper.readTree(result.getResponse().getContentAsString());
+        return root.path("accessToken").asText();
+    }
+
     private long createClient(String name) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/clients")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -264,6 +448,7 @@ class ApiIntegrationTest {
 
     private long createTicket(long clientId, String status) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/tickets")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -284,6 +469,7 @@ class ApiIntegrationTest {
 
     private long createInventory(String name, int quantity) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/inventory")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -301,6 +487,7 @@ class ApiIntegrationTest {
 
     private void addPart(long ticketId, long inventoryId, int quantity) throws Exception {
         mockMvc.perform(post("/api/tickets/{ticketId}/parts", ticketId)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
