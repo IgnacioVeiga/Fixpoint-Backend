@@ -54,6 +54,17 @@ Cada una levanta `com.fixpoint.FixpointApplication` usando su archivo `.env.*`.
 - `POST /api/auth/register`: available only in `dev` profile.
 - Production user provisioning is handled by Flyway SQL (`src/main/resources/db/migration/prod/V0_3__Bootstrap_prod_users.sql`).
 
+## Dev Profile with Cloud PostgreSQL
+
+Minimum required environment variables for `dev`:
+
+- `DB_URL` (example: `jdbc:postgresql://db-host:5432/fixpoint?sslmode=require`)
+- `DB_USERNAME`
+- `DB_PASSWORD`
+- `JWT_SECRET` (minimum 32 chars)
+
+If any of these are missing, startup now fails fast with a clear validation message.
+
 ## Comandos
 
 ```bash
