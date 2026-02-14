@@ -2,6 +2,7 @@ package com.fixpoint.business.attachments.controller;
 
 import com.fixpoint.business.attachments.dto.AttachmentDTO;
 import com.fixpoint.business.attachments.service.AttachmentService;
+import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -9,12 +10,14 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.validation.annotation.Validated;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/attachments")
 @RequiredArgsConstructor
+@Validated
 public class AttachmentController {
 
     private final AttachmentService attachmentService;
@@ -33,7 +36,7 @@ public class AttachmentController {
     public AttachmentDTO uploadFile(
             @PathVariable Long ticketId,
             @RequestParam("file") MultipartFile file,
-            @RequestParam("fileType") String fileType) {
+            @RequestParam("fileType") @Pattern(regexp = "photo|contract|invoice|other") String fileType) {
         return attachmentService.uploadFile(ticketId, file, fileType);
     }
 

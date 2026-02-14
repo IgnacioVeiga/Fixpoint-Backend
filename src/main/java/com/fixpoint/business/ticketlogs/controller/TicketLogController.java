@@ -21,11 +21,7 @@ public class TicketLogController {
             @PathVariable Long ticketId,
             @RequestBody @Valid CreateTicketLogDTO dto
     ) {
-        return ticketLogService.createLog(new CreateTicketLogDTO(
-                ticketId,
-                dto.description(),
-                dto.author()
-        ));
+        return ticketLogService.createLog(ticketId, dto);
     }
 
     @GetMapping

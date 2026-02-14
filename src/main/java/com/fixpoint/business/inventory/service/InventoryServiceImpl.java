@@ -3,11 +3,12 @@ package com.fixpoint.business.inventory.service;
 import com.fixpoint.business.inventory.dto.InventoryDTO;
 import com.fixpoint.business.inventory.entity.Inventory;
 import com.fixpoint.business.inventory.repository.InventoryRepository;
+import com.fixpoint.business.ticketparts.repository.TicketPartRepository;
 import com.fixpoint.business.ticketparts.service.TicketPartService;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @Service
@@ -15,7 +16,7 @@ import java.util.List;
 public class InventoryServiceImpl implements InventoryService {
 
     private final InventoryRepository repository;
-    private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private final TicketPartRepository ticketPartRepository;
 
     @Override
     public List<InventoryDTO> findAll() {
@@ -28,7 +29,7 @@ public class InventoryServiceImpl implements InventoryService {
     public InventoryDTO findById(Long id) {
         return repository.findById(id)
                 .map(this::toDto)
-                .orElseThrow(() -> new RuntimeException(TicketPartService.INVENTORY_ITEM_NOT_FOUND));
+                .orElseThrow(() -> new EntityNotFoundException(TicketPartService.INVENTORY_ITEM_NOT_FOUND));
     }
 
     @Override
@@ -40,7 +41,7 @@ public class InventoryServiceImpl implements InventoryService {
     @Override
     public InventoryDTO update(Long id, InventoryDTO dto) {
         Inventory existing = repository.findById(id)
-                .orElseThrow(() -> new RuntimeException(TicketPartService.INVENTORY_ITEM_NOT_FOUND));
+                .orElseThrow(() -> new EntityNotFoundException(TicketPartService.INVENTORY_ITEM_NOT_FOUND));
         existing.setName(dto.getName());
         existing.setComponentType(dto.getComponentType());
         existing.setDescription(dto.getDescription());
@@ -53,7 +54,14 @@ public class InventoryServiceImpl implements InventoryService {
 
     @Override
     public void delete(Long id) {
-        repository.deleteById(id);
+        Inventory inventory = repository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException(TicketPartService.INVENTORY_ITEM_NOT_FOUND));
+
+        if (ticketPartRepository.existsByInventoryId(id)) {
+            throw new IllegalStateException("Cannot delete inventory item because it is linked to ticket parts");
+        }
+
+        repository.delete(inventory);
     }
 
     private InventoryDTO toDto(Inventory i) {
@@ -66,7 +74,7 @@ public class InventoryServiceImpl implements InventoryService {
                 .source(i.getSource())
                 .quantity(i.getQuantity())
                 .location(i.getLocation())
-                .addedAt(i.getAddedAt().format(formatter))
+                .addedAt(i.getAddedAt())
                 .build();
     }
 

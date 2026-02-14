@@ -7,4 +7,5 @@ import java.util.List;
 
 public interface TicketPartRepository extends JpaRepository<TicketPart, Long> {
     List<TicketPart> findByTicketId(Long ticketId);
+    boolean existsByInventoryId(Long inventoryId);
 }

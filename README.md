@@ -1,1 +1,51 @@
-# Fixpoint - Backend
+# Fixpoint Backend
+
+## Perfiles de entorno
+
+- `dev`: desarrollo local con PostgreSQL.
+- `qa`: pruebas contra infraestructura de QA.
+- `prod`: producción.
+- `mock`: ejecución demo sin PostgreSQL (H2 en memoria).
+
+Archivos asociados:
+
+- `src/main/resources/application-dev.properties`
+- `src/main/resources/application-qa.properties`
+- `src/main/resources/application-prod.properties`
+- `src/main/resources/application-mock.properties`
+
+## Variables de entorno
+
+Base común (`application.properties`):
+
+- `DB_URL`
+- `DB_USERNAME`
+- `DB_PASSWORD`
+- `CORS_ALLOWED_ORIGINS`
+- `FILE_UPLOAD_DIR`
+- `APP_TIMEZONE`
+
+Plantillas por entorno para IntelliJ:
+
+- `.env.dev`
+- `.env.qa`
+- `.env.prod`
+- `.env.mock`
+
+## IntelliJ IDEA
+
+Hay run configurations compartidas en `.run/`:
+
+- `Backend - Dev`
+- `Backend - QA`
+- `Backend - Prod`
+- `Backend - Mock`
+
+Cada una levanta `com.fixpoint.FixpointApplication` usando su archivo `.env.*`.
+
+## Comandos
+
+```bash
+./mvnw test
+./mvnw -DskipTests package
+```

@@ -2,6 +2,7 @@ package com.fixpoint.business.inventory.controller;
 
 import com.fixpoint.business.inventory.dto.InventoryDTO;
 import com.fixpoint.business.inventory.service.InventoryService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -26,12 +27,12 @@ public class InventoryController {
     }
 
     @PostMapping
-    public ResponseEntity<InventoryDTO> create(@RequestBody InventoryDTO dto) {
+    public ResponseEntity<InventoryDTO> create(@RequestBody @Valid InventoryDTO dto) {
         return ResponseEntity.ok(service.save(dto));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<InventoryDTO> update(@PathVariable Long id, @RequestBody InventoryDTO dto) {
+    public ResponseEntity<InventoryDTO> update(@PathVariable Long id, @RequestBody @Valid InventoryDTO dto) {
         return ResponseEntity.ok(service.update(id, dto));
     }
 

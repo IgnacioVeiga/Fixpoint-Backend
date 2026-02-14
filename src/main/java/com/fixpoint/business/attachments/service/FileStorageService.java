@@ -1,5 +1,6 @@
 package com.fixpoint.business.attachments.service;
 
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
@@ -28,28 +29,33 @@ public class FileStorageService {
         try {
             Files.createDirectories(this.fileStorageLocation);
         } catch (IOException ex) {
-            throw new RuntimeException("Could not create the directory where the uploaded files will be stored.", ex);
+            throw new IllegalStateException("Could not create the directory where the uploaded files will be stored.", ex);
         }
     }
 
     public String storeFile(MultipartFile file) {
+        if (file.isEmpty()) {
+            throw new IllegalArgumentException("File must not be empty");
+        }
+
         String originalFileName = StringUtils.cleanPath(
             Objects.requireNonNull(file.getOriginalFilename(), AttachmentServiceImpl.ORIGINAL_FILENAME_MUST_NOT_BE_NULL)
         );
-        String fileExtension = originalFileName.substring(originalFileName.lastIndexOf("."));
+        if (originalFileName.contains("..")) {
+            throw new IllegalArgumentException("Invalid file path sequence " + originalFileName);
+        }
+
+        int extensionIndex = originalFileName.lastIndexOf(".");
+        String fileExtension = extensionIndex >= 0 ? originalFileName.substring(extensionIndex) : "";
         String fileName = UUID.randomUUID() + fileExtension;
 
         try {
-            if (fileName.contains("..")) {
-                throw new RuntimeException("Invalid file path sequence " + fileName);
-            }
-
             Path targetLocation = this.fileStorageLocation.resolve(fileName);
             Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
 
             return fileName;
         } catch (IOException ex) {
-            throw new RuntimeException(STORAGE_ERROR, ex);
+            throw new IllegalStateException(STORAGE_ERROR, ex);
         }
     }
 
@@ -60,10 +66,10 @@ public class FileStorageService {
             if (resource.exists()) {
                 return resource;
             } else {
-                throw new RuntimeException(FILE_NOT_FOUND + fileName);
+                throw new EntityNotFoundException(FILE_NOT_FOUND + fileName);
             }
         } catch (MalformedURLException ex) {
-            throw new RuntimeException(FILE_NOT_FOUND + fileName, ex);
+            throw new EntityNotFoundException(FILE_NOT_FOUND + fileName);
         }
     }
 
@@ -72,7 +78,7 @@ public class FileStorageService {
             Path filePath = this.fileStorageLocation.resolve(fileName).normalize();
             Files.deleteIfExists(filePath);
         } catch (IOException ex) {
-            throw new RuntimeException("Could not delete file " + fileName, ex);
+            throw new IllegalStateException("Could not delete file " + fileName, ex);
         }
     }
 }

@@ -7,6 +7,7 @@ import com.fixpoint.business.ticketlogs.repository.TicketLogRepository;
 import com.fixpoint.business.tickets.entity.Ticket;
 import com.fixpoint.business.tickets.repository.TicketRepository;
 import com.fixpoint.business.tickets.service.TicketServiceImpl;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -20,9 +21,9 @@ public class TicketLogService {
     private final TicketLogRepository ticketLogRepository;
     private final TicketRepository ticketRepository;
 
-    public TicketLogDTO createLog(CreateTicketLogDTO dto) {
-        Ticket ticket = ticketRepository.findById(dto.ticketId())
-                .orElseThrow(() -> new IllegalArgumentException(TicketServiceImpl.TICKET_NOT_FOUND));
+    public TicketLogDTO createLog(Long ticketId, CreateTicketLogDTO dto) {
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new EntityNotFoundException(TicketServiceImpl.TICKET_NOT_FOUND));
 
         TicketLog log = TicketLog.builder()
                 .ticket(ticket)

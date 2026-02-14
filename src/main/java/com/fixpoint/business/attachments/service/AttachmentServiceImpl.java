@@ -6,12 +6,12 @@ import com.fixpoint.business.attachments.repository.AttachmentRepository;
 import com.fixpoint.business.tickets.entity.Ticket;
 import com.fixpoint.business.tickets.repository.TicketRepository;
 import com.fixpoint.business.tickets.service.TicketServiceImpl;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Objects;
 
@@ -25,12 +25,11 @@ public class AttachmentServiceImpl implements AttachmentService {
     private final AttachmentRepository attachmentRepo;
     private final TicketRepository ticketRepo;
     private final FileStorageService fileStorageService;
-    private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     @Override
     public List<AttachmentDTO> findByTicketId(Long ticketId) {
         Ticket ticket = ticketRepo.findById(ticketId)
-                .orElseThrow(() -> new RuntimeException(TicketServiceImpl.TICKET_NOT_FOUND));
+                .orElseThrow(() -> new EntityNotFoundException(TicketServiceImpl.TICKET_NOT_FOUND));
 
         return attachmentRepo.findByTicket(ticket).stream()
                 .map(this::toDto)
@@ -41,13 +40,13 @@ public class AttachmentServiceImpl implements AttachmentService {
     public AttachmentDTO findById(Long id) {
         return attachmentRepo.findById(id)
                 .map(this::toDto)
-                .orElseThrow(() -> new RuntimeException(ATTACHMENT_NOT_FOUND));
+                .orElseThrow(() -> new EntityNotFoundException(ATTACHMENT_NOT_FOUND));
     }
 
     @Override
     public AttachmentDTO save(AttachmentDTO dto) {
         Ticket ticket = ticketRepo.findById(dto.getTicketId())
-                .orElseThrow(() -> new RuntimeException(TicketServiceImpl.TICKET_NOT_FOUND));
+                .orElseThrow(() -> new EntityNotFoundException(TicketServiceImpl.TICKET_NOT_FOUND));
 
         Attachment attachment = Attachment.builder()
                 .ticket(ticket)
@@ -62,7 +61,7 @@ public class AttachmentServiceImpl implements AttachmentService {
     @Override
     public AttachmentDTO uploadFile(Long ticketId, MultipartFile file, String fileType) {
         Ticket ticket = ticketRepo.findById(ticketId)
-                .orElseThrow(() -> new RuntimeException(TicketServiceImpl.TICKET_NOT_FOUND));
+                .orElseThrow(() -> new EntityNotFoundException(TicketServiceImpl.TICKET_NOT_FOUND));
 
         String originalFilename = Objects.requireNonNull(file.getOriginalFilename(), ORIGINAL_FILENAME_MUST_NOT_BE_NULL);
         String storedFileName = fileStorageService.storeFile(file);
@@ -80,14 +79,14 @@ public class AttachmentServiceImpl implements AttachmentService {
     @Override
     public Resource downloadFile(Long id) {
         Attachment attachment = attachmentRepo.findById(id)
-                .orElseThrow(() -> new RuntimeException(ATTACHMENT_NOT_FOUND));
+                .orElseThrow(() -> new EntityNotFoundException(ATTACHMENT_NOT_FOUND));
         return fileStorageService.loadFileAsResource(attachment.getFilepath());
     }
 
     @Override
     public void delete(Long id) {
         Attachment attachment = attachmentRepo.findById(id)
-                .orElseThrow(() -> new RuntimeException(ATTACHMENT_NOT_FOUND));
+                .orElseThrow(() -> new EntityNotFoundException(ATTACHMENT_NOT_FOUND));
 
         fileStorageService.deleteFile(attachment.getFilepath());
         attachmentRepo.delete(attachment);
@@ -96,7 +95,7 @@ public class AttachmentServiceImpl implements AttachmentService {
     @Override
     public AttachmentDTO replaceFile(Long id, MultipartFile file) {
         Attachment attachment = attachmentRepo.findById(id)
-                .orElseThrow(() -> new RuntimeException(ATTACHMENT_NOT_FOUND));
+                .orElseThrow(() -> new EntityNotFoundException(ATTACHMENT_NOT_FOUND));
 
         // Delete old file
         fileStorageService.deleteFile(attachment.getFilepath());
@@ -119,7 +118,7 @@ public class AttachmentServiceImpl implements AttachmentService {
                 .filename(attachment.getFilename())
                 .filepath(attachment.getFilepath())
                 .fileType(attachment.getFileType())
-                .uploadedAt(attachment.getUploadedAt().format(formatter))
+                .uploadedAt(attachment.getUploadedAt())
                 .build();
     }
 }

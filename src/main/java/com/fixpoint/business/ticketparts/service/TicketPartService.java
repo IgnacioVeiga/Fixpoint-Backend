@@ -9,8 +9,10 @@ import com.fixpoint.business.ticketparts.repository.TicketPartRepository;
 import com.fixpoint.business.tickets.entity.Ticket;
 import com.fixpoint.business.tickets.repository.TicketRepository;
 import com.fixpoint.business.tickets.service.TicketServiceImpl;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -23,12 +25,24 @@ public class TicketPartService {
     private final TicketRepository ticketRepository;
     private final InventoryRepository inventoryRepository;
 
+    @Transactional
     public TicketPartDTO addPartToTicket(Long ticketId, AddTicketPartDTO dto) {
+        if (dto.quantity() == null || dto.quantity() < 1) {
+            throw new IllegalArgumentException("Part quantity must be greater than zero");
+        }
+
         Ticket ticket = ticketRepository.findById(ticketId)
-                .orElseThrow(() -> new IllegalArgumentException(TicketServiceImpl.TICKET_NOT_FOUND));
+                .orElseThrow(() -> new EntityNotFoundException(TicketServiceImpl.TICKET_NOT_FOUND));
 
         Inventory inventory = inventoryRepository.findById(dto.inventoryId())
-                .orElseThrow(() -> new IllegalArgumentException(INVENTORY_ITEM_NOT_FOUND));
+                .orElseThrow(() -> new EntityNotFoundException(INVENTORY_ITEM_NOT_FOUND));
+
+        if (inventory.getQuantity() < dto.quantity()) {
+            throw new IllegalStateException("Insufficient stock for inventory item");
+        }
+
+        inventory.setQuantity(inventory.getQuantity() - dto.quantity());
+        inventoryRepository.save(inventory);
 
         TicketPart part = TicketPart.builder()
                 .ticket(ticket)

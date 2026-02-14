@@ -1,0 +1,12 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Backend - QA" type="Application" factoryName="Application">
+    <option name="envFilePaths">
+      <option value="$PROJECT_DIR$/.env.qa" />
+    </option>
+    <option name="MAIN_CLASS_NAME" value="com.fixpoint.FixpointApplication" />
+    <module name="fixpoint" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>
