@@ -1,61 +1,61 @@
 # Fixpoint Backend
 
-## Perfiles de entorno
+Spring Boot API for workshop operations (tickets, clients, inventory, attachments) with JWT access tokens and
+cookie-based refresh sessions.
 
-- `dev`: desarrollo local con PostgreSQL.
-- `qa`: pruebas contra infraestructura de QA.
-- `prod`: producción.
-- `mock`: ejecución demo sin PostgreSQL (H2 en memoria).
+## Scope
 
-Archivos asociados:
+- Profiles: `dev`, `qa`, `prod`
+- Database: PostgreSQL + Flyway
+- Authentication:
+  - short-lived access token (`Bearer`)
+  - HttpOnly refresh cookie with rotation + server-side revocation
 
-- `src/main/resources/application-dev.properties`
-- `src/main/resources/application-qa.properties`
-- `src/main/resources/application-prod.properties`
-- `src/main/resources/application-mock.properties`
+## Quick Start
 
-## Variables de entorno
+1. Copy `.env.example` to `.env.dev`
+2. Fill values for your local/cloud DB and JWT secret
+3. Run `Backend - Dev` (IntelliJ) or CLI
+4. Confirm logs show:
+  - Flyway migration success
+  - `Environment validation passed`
 
-Base común (`application.properties`):
+## Start Here (Docs)
 
-- `DB_URL`
-- `DB_USERNAME`
-- `DB_PASSWORD`
-- `CORS_ALLOWED_ORIGINS`
-- `FILE_UPLOAD_DIR`
-- `APP_TIMEZONE`
+- `docs/DEVELOPMENT_SETUP.md` - setup, startup checks, profile behavior
+- `docs/ENVIRONMENT_VARIABLES.md` - canonical env var reference by context
+- `docs/AUTHENTICATION.md` - login/refresh/logout design and token lifecycle
+- `docs/USER_PROVISIONING.md` - how to create users in dev and prod safely
+- `docs/TROUBLESHOOTING.md` - common startup/auth/CORS issues and fixes
+- `BRANCH_PROTECTION_CHECKLIST.md` - repository governance checklist
 
-Plantillas por entorno para IntelliJ:
+## Environment File Policy
 
-- `.env.dev`
-- `.env.qa`
-- `.env.prod`
-- `.env.mock`
+- Only `.env.example` is tracked in git
+- Real files are local-only and ignored:
+  - `.env.dev`
+  - `.env.qa`
+  - `.env.prod`
+- Never commit real credentials or secrets
 
-## IntelliJ IDEA
+## IntelliJ Run Configurations
 
-Hay run configurations compartidas en `.run/`:
+Shared run configs live in `.run/`:
 
 - `Backend - Dev`
 - `Backend - QA`
 - `Backend - Prod`
-- `Backend - Mock`
 
-Cada una levanta `com.fixpoint.FixpointApplication` usando su archivo `.env.*`.
+Each config reads `.env.<profile>` from project root.
 
-## Comandos
+## Useful Commands
 
 ```bash
 ./mvnw test
 ./mvnw -DskipTests package
 ```
 
-## Unit tests included
-
-- `TicketPartServiceTest`: stock validation and DTO mapping.
-- `InventoryServiceImplTest`: delete guard when inventory is linked to ticket parts.
-- `GlobalExceptionHandlerTest`: HTTP status and response payload mapping.
-
 ## CI
 
-GitHub Actions workflow: `.github/workflows/ci.yml` runs tests and package build on push/PR.
+- Workflow: `.github/workflows/ci.yml`
+- Trigger policy: runs on commits to `main`

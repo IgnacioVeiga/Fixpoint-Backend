@@ -1,0 +1,606 @@
+package com.fixpoint.integration;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fixpoint.auth.repository.AppUserRepository;
+import com.fixpoint.business.attachments.repository.AttachmentRepository;
+import com.fixpoint.business.clients.repository.ClientRepository;
+import com.fixpoint.business.inventory.repository.InventoryRepository;
+import com.fixpoint.business.ticketparts.repository.TicketPartRepository;
+import com.fixpoint.business.tickets.repository.TicketRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
+import jakarta.servlet.http.Cookie;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Comparator;
+import java.util.Objects;
+
+import static org.hamcrest.Matchers.containsString;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("dev")
+class ApiIntegrationTest {
+    private static final Path TEST_UPLOAD_DIR = Path.of("target", "test-uploads");
+    private static final String DEFAULT_PASSWORD = "integration-pass-2026";
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Autowired
+    private TicketPartRepository ticketPartRepository;
+
+    @Autowired
+    private TicketRepository ticketRepository;
+
+    @Autowired
+    private InventoryRepository inventoryRepository;
+
+    @Autowired
+    private ClientRepository clientRepository;
+
+    @Autowired
+    private AttachmentRepository attachmentRepository;
+
+    @Autowired
+    private AppUserRepository appUserRepository;
+
+    private String authToken;
+
+    @BeforeEach
+    void cleanDatabase() throws Exception {
+        attachmentRepository.deleteAll();
+        ticketPartRepository.deleteAll();
+        ticketRepository.deleteAll();
+        inventoryRepository.deleteAll();
+        clientRepository.deleteAll();
+        appUserRepository.deleteAll();
+        cleanUploadDirectory();
+
+        String username = "dev-user-" + System.nanoTime();
+        registerUser(username, DEFAULT_PASSWORD);
+        authToken = loginUser(username, DEFAULT_PASSWORD);
+    }
+
+    @Test
+    void shouldRequireAuthenticationForProtectedEndpoints() throws Exception {
+        mockMvc.perform(get("/api/tickets"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Authentication required"));
+    }
+
+    @Test
+    void shouldRegisterAndLoginUserInDevProfile() throws Exception {
+        String username = "new-dev-user-" + System.nanoTime();
+
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "%s",
+                                  "password": "%s"
+                                }
+                                """.formatted(username, DEFAULT_PASSWORD)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.accessToken").isString())
+                .andExpect(jsonPath("$.username").value(username))
+                .andExpect(jsonPath("$.role").value("TECH"))
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("fixpoint_refresh_token=")));
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "%s",
+                                  "password": "%s"
+                                }
+                                """.formatted(username, DEFAULT_PASSWORD)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.accessToken").isString())
+                .andExpect(jsonPath("$.username").value(username))
+                .andExpect(jsonPath("$.role").value("TECH"))
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("fixpoint_refresh_token=")));
+    }
+
+    @Test
+    void shouldRejectInvalidLoginCredentials() throws Exception {
+        String username = "login-fail-" + System.nanoTime();
+        registerUser(username, DEFAULT_PASSWORD);
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "%s",
+                                  "password": "wrong-password"
+                                }
+                                """.formatted(username)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Invalid username or password"));
+    }
+
+    @Test
+    void shouldRotateRefreshCookieAndIssueNewAccessToken() throws Exception {
+        String username = "refresh-user-" + System.nanoTime();
+        registerUser(username, DEFAULT_PASSWORD);
+
+        MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "%s",
+                                  "password": "%s"
+                                }
+                                """.formatted(username, DEFAULT_PASSWORD)))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("fixpoint_refresh_token=")))
+                .andReturn();
+
+        String previousRefreshToken = readRefreshCookieValue(loginResult);
+
+        MvcResult refreshResult = mockMvc.perform(post("/api/auth/refresh")
+                        .cookie(new Cookie("fixpoint_refresh_token", previousRefreshToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.accessToken").isString())
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("fixpoint_refresh_token=")))
+                .andReturn();
+
+        String newRefreshToken = readRefreshCookieValue(refreshResult);
+        org.junit.jupiter.api.Assertions.assertNotEquals(previousRefreshToken, newRefreshToken);
+    }
+
+    @Test
+    void logoutShouldRevokeRefreshToken() throws Exception {
+        String username = "logout-user-" + System.nanoTime();
+        registerUser(username, DEFAULT_PASSWORD);
+
+        MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "%s",
+                                  "password": "%s"
+                                }
+                                """.formatted(username, DEFAULT_PASSWORD)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String refreshToken = readRefreshCookieValue(loginResult);
+
+        mockMvc.perform(post("/api/auth/logout")
+                        .cookie(new Cookie("fixpoint_refresh_token", refreshToken)))
+                .andExpect(status().isNoContent())
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("Max-Age=0")));
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .cookie(new Cookie("fixpoint_refresh_token", refreshToken)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Invalid or expired session"));
+    }
+
+    @Test
+    void shouldCreateTicketForExistingClient() throws Exception {
+        long clientId = createClient("Alice");
+
+        mockMvc.perform(post("/api/tickets")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "clientId": %d,
+                                  "deviceType": "Laptop",
+                                  "entryDate": "2026-02-14",
+                                  "problemDescription": "No power",
+                                  "status": "diagnosing",
+                                  "needsContract": false,
+                                  "contractSigned": false
+                                }
+                                """.formatted(clientId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").isNumber())
+                .andExpect(jsonPath("$.clientId").value(clientId))
+                .andExpect(jsonPath("$.deviceType").value("Laptop"))
+                .andExpect(jsonPath("$.status").value("diagnosing"));
+    }
+
+    @Test
+    void shouldExposeTicketStatusDefinitions() throws Exception {
+        mockMvc.perform(get("/api/tickets/statuses")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(7))
+                .andExpect(jsonPath("$[0].value").value("received"))
+                .andExpect(jsonPath("$[0].closed").value(false))
+                .andExpect(jsonPath("$[0].nextStatuses[0]").value("diagnosing"))
+                .andExpect(jsonPath("$[0].nextStatuses[1]").value("cancelled"))
+                .andExpect(jsonPath("$[5].value").value("returned"))
+                .andExpect(jsonPath("$[5].closed").value(true))
+                .andExpect(jsonPath("$[5].nextStatuses").isEmpty());
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenInventoryQuantityIsInvalid() throws Exception {
+        mockMvc.perform(post("/api/inventory")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "Display 7in",
+                                  "componentType": "display",
+                                  "condition": "new",
+                                  "quantity": 0
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("quantity")));
+    }
+
+    @Test
+    void shouldReturnConflictWhenPartQuantityExceedsStock() throws Exception {
+        long clientId = createClient("Bob");
+        long ticketId = createTicket(clientId);
+        long inventoryId = createInventory("Battery X", 1);
+
+        mockMvc.perform(post("/api/tickets/{ticketId}/parts", ticketId)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "inventoryId": %d,
+                                  "quantity": 2,
+                                  "note": "Need replacement"
+                                }
+                                """.formatted(inventoryId)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message", containsString("Insufficient stock")));
+    }
+
+    @Test
+    void shouldReturnConflictWhenDeletingLinkedInventoryItem() throws Exception {
+        long clientId = createClient("Carla");
+        long ticketId = createTicket(clientId);
+        long inventoryId = createInventory("Fan C", 4);
+        addPart(ticketId, inventoryId, 1);
+
+        mockMvc.perform(delete("/api/inventory/{id}", inventoryId)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message", containsString("linked to ticket parts")));
+    }
+
+    @Test
+    void shouldReturnNotFoundForMissingTicket() throws Exception {
+        mockMvc.perform(get("/api/tickets/{id}", 999999)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Ticket not found"));
+    }
+
+    @Test
+    void shouldRejectInvalidTicketStatusTransition() throws Exception {
+        long clientId = createClient("Erica");
+        long ticketId = createTicket(clientId);
+
+        mockMvc.perform(put("/api/tickets/{id}", ticketId)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "clientId": %d,
+                                  "deviceType": "Phone",
+                                  "entryDate": "2026-02-14",
+                                  "problemDescription": "Broken button",
+                                  "status": "repaired",
+                                  "needsContract": false,
+                                  "contractSigned": false
+                                }
+                                """.formatted(clientId)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message", containsString("Invalid ticket status transition")));
+    }
+
+    @Test
+    void shouldRejectTicketUpdateWhenTicketIsClosed() throws Exception {
+        long clientId = createClient("Closed User");
+        long ticketId = createTicket(clientId, "returned");
+
+        mockMvc.perform(put("/api/tickets/{id}", ticketId)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "clientId": %d,
+                                  "deviceType": "Phone",
+                                  "entryDate": "2026-02-14",
+                                  "problemDescription": "Trying to edit closed ticket",
+                                  "status": "returned",
+                                  "needsContract": false,
+                                  "contractSigned": false
+                                }
+                                """.formatted(clientId)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Closed tickets cannot be edited"));
+    }
+
+    @Test
+    void shouldRejectTicketDeletionWhenTicketIsClosed() throws Exception {
+        long clientId = createClient("Closed Delete User");
+        long ticketId = createTicket(clientId, "returned");
+
+        mockMvc.perform(delete("/api/tickets/{id}", ticketId)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Closed tickets cannot be deleted"));
+    }
+
+    @Test
+    void shouldRejectTicketDeletionWhenTicketHasRelatedData() throws Exception {
+        long clientId = createClient("Linked Delete User");
+        long ticketId = createTicket(clientId, "diagnosing");
+        long inventoryId = createInventory("Delete rule item", 3);
+        addPart(ticketId, inventoryId, 1);
+
+        mockMvc.perform(delete("/api/tickets/{id}", ticketId)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Cannot delete ticket with related parts, logs, or attachments"));
+    }
+
+    @Test
+    void shouldRejectLogCreationForClosedTicket() throws Exception {
+        long clientId = createClient("Frank");
+        long ticketId = createTicket(clientId, "returned");
+
+        mockMvc.perform(post("/api/tickets/{ticketId}/logs", ticketId)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "description": "Final review note",
+                                  "author": "tech"
+                                }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Cannot add logs to a closed ticket"));
+    }
+
+    @Test
+    void shouldRejectAttachmentUploadForClosedTicket() throws Exception {
+        long clientId = createClient("Attachment Closed");
+        long ticketId = createTicket(clientId, "cancelled");
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "evidence.txt",
+                MediaType.TEXT_PLAIN_VALUE,
+                "evidence".getBytes()
+        );
+
+        mockMvc.perform(multipart("/api/attachments/upload/ticket/{ticketId}", ticketId)
+                        .file(file)
+                        .param("fileType", "other")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Cannot upload attachments for a closed ticket"));
+    }
+
+    @Test
+    void shouldUploadListDownloadAndDeleteAttachment() throws Exception {
+        long clientId = createClient("Diana");
+        long ticketId = createTicket(clientId);
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "diagnostic-note.txt",
+                MediaType.TEXT_PLAIN_VALUE,
+                "diagnostic-content".getBytes()
+        );
+
+        MvcResult uploadResult = mockMvc.perform(multipart("/api/attachments/upload/ticket/{ticketId}", ticketId)
+                        .file(file)
+                        .param("fileType", "other")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").isNumber())
+                .andExpect(jsonPath("$.ticketId").value(ticketId))
+                .andExpect(jsonPath("$.filename").value("diagnostic-note.txt"))
+                .andExpect(jsonPath("$.fileType").value("other"))
+                .andReturn();
+
+        long attachmentId = readId(uploadResult);
+
+        mockMvc.perform(get("/api/attachments/ticket/{ticketId}", ticketId)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(attachmentId))
+                .andExpect(jsonPath("$[0].filename").value("diagnostic-note.txt"));
+
+        mockMvc.perform(get("/api/attachments/download/{id}", attachmentId)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, containsString("diagnostic-note.txt")))
+                .andExpect(content().bytes("diagnostic-content".getBytes()));
+
+        mockMvc.perform(delete("/api/attachments/{id}", attachmentId)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/attachments/{id}", attachmentId)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Attachment not found"));
+    }
+
+    private String bearerToken() {
+        return "Bearer " + authToken;
+    }
+
+    private void registerUser(String username, String password) throws Exception {
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "%s",
+                                  "password": "%s"
+                                }
+                                """.formatted(username, password)))
+                .andExpect(status().isOk());
+    }
+
+    private String loginUser(String username, String password) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "%s",
+                                  "password": "%s"
+                                }
+                                """.formatted(username, password)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode root = objectMapper.readTree(result.getResponse().getContentAsString());
+        return root.path("accessToken").asText();
+    }
+
+    private long createClient(String name) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/clients")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "%s",
+                                  "dni": "12345678"
+                                }
+                                """.formatted(name)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        return readId(result);
+    }
+
+    private long createTicket(long clientId) throws Exception {
+        return createTicket(clientId, "diagnosing");
+    }
+
+    private long createTicket(long clientId, String status) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/tickets")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "clientId": %d,
+                                  "deviceType": "Phone",
+                                  "entryDate": "2026-02-14",
+                                  "problemDescription": "Broken button",
+                                  "status": "%s",
+                                  "needsContract": false,
+                                  "contractSigned": false
+                                }
+                                """.formatted(clientId, status)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        return readId(result);
+    }
+
+    private long createInventory(String name, int quantity) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/inventory")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "%s",
+                                  "componentType": "generic",
+                                  "condition": "new",
+                                  "quantity": %d
+                                }
+                                """.formatted(name, quantity)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        return readId(result);
+    }
+
+    private void addPart(long ticketId, long inventoryId, int quantity) throws Exception {
+        mockMvc.perform(post("/api/tickets/{ticketId}/parts", ticketId)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "inventoryId": %d,
+                                  "quantity": %d,
+                                  "note": "Added by integration test"
+                                }
+                                """.formatted(inventoryId, quantity)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").isNumber());
+    }
+
+    private long readId(MvcResult result) throws Exception {
+        JsonNode root = objectMapper.readTree(result.getResponse().getContentAsString());
+        return root.path("id").asLong();
+    }
+
+    private String readRefreshCookieValue(MvcResult result) {
+        String setCookie = result.getResponse().getHeader(HttpHeaders.SET_COOKIE);
+        if (setCookie == null || !setCookie.contains("=")) {
+            throw new IllegalStateException("Missing refresh Set-Cookie header");
+        }
+
+        String[] keyValue = setCookie.split(";", 2)[0].split("=", 2);
+        if (keyValue.length != 2 || !Objects.equals("fixpoint_refresh_token", keyValue[0])) {
+            throw new IllegalStateException("Invalid refresh Set-Cookie header format");
+        }
+
+        return keyValue[1];
+    }
+
+    private void cleanUploadDirectory() {
+        if (!Files.exists(TEST_UPLOAD_DIR)) {
+            return;
+        }
+
+        try {
+            Files.walk(TEST_UPLOAD_DIR)
+                    .sorted(Comparator.reverseOrder())
+                    .forEach(path -> {
+                        try {
+                            Files.deleteIfExists(path);
+                        } catch (IOException ex) {
+                            throw new IllegalStateException("Failed to clean test upload directory", ex);
+                        }
+                    });
+            Files.createDirectories(TEST_UPLOAD_DIR);
+        } catch (IOException ex) {
+            throw new IllegalStateException("Failed to clean test upload directory", ex);
+        }
+    }
+}

@@ -6,6 +6,7 @@ import com.fixpoint.business.ticketparts.dto.AddTicketPartDTO;
 import com.fixpoint.business.ticketparts.dto.TicketPartDTO;
 import com.fixpoint.business.ticketparts.entity.TicketPart;
 import com.fixpoint.business.ticketparts.repository.TicketPartRepository;
+import com.fixpoint.business.tickets.domain.TicketStatus;
 import com.fixpoint.business.tickets.entity.Ticket;
 import com.fixpoint.business.tickets.repository.TicketRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -47,7 +48,10 @@ class TicketPartServiceTest {
         Long ticketId = 10L;
         Long inventoryId = 5L;
 
-        Ticket ticket = Ticket.builder().id(ticketId).build();
+        Ticket ticket = Ticket.builder()
+                .id(ticketId)
+                .status(TicketStatus.DIAGNOSING.value())
+                .build();
         Inventory inventory = Inventory.builder()
                 .id(inventoryId)
                 .name("Display A12")
@@ -79,6 +83,7 @@ class TicketPartServiceTest {
         verify(ticketPartRepository).save(savedPartCaptor.capture());
         assertEquals(ticketId, savedPartCaptor.getValue().getTicket().getId());
         assertEquals(inventoryId, savedPartCaptor.getValue().getInventory().getId());
+        verify(ticketRepository).save(ticket);
     }
 
     @Test
@@ -86,7 +91,10 @@ class TicketPartServiceTest {
         Long ticketId = 20L;
         Long inventoryId = 8L;
 
-        Ticket ticket = Ticket.builder().id(ticketId).build();
+        Ticket ticket = Ticket.builder()
+                .id(ticketId)
+                .status(TicketStatus.DIAGNOSING.value())
+                .build();
         Inventory inventory = Inventory.builder()
                 .id(inventoryId)
                 .name("Battery B9")
@@ -114,7 +122,10 @@ class TicketPartServiceTest {
         Long ticketId = 30L;
         Long inventoryId = 12L;
 
-        Ticket ticket = Ticket.builder().id(ticketId).build();
+        Ticket ticket = Ticket.builder()
+                .id(ticketId)
+                .status(TicketStatus.DIAGNOSING.value())
+                .build();
         AddTicketPartDTO dto = new AddTicketPartDTO(inventoryId, 1, null);
 
         when(ticketRepository.findById(ticketId)).thenReturn(Optional.of(ticket));
@@ -126,6 +137,30 @@ class TicketPartServiceTest {
         );
 
         assertEquals(TicketPartService.INVENTORY_ITEM_NOT_FOUND, ex.getMessage());
+    }
+
+    @Test
+    void addPartToTicketShouldThrowWhenTicketIsClosed() {
+        Long ticketId = 50L;
+        Long inventoryId = 3L;
+
+        Ticket ticket = Ticket.builder()
+                .id(ticketId)
+                .status(TicketStatus.RETURNED.value())
+                .build();
+
+        AddTicketPartDTO dto = new AddTicketPartDTO(inventoryId, 1, null);
+
+        when(ticketRepository.findById(ticketId)).thenReturn(Optional.of(ticket));
+
+        IllegalStateException ex = assertThrows(
+                IllegalStateException.class,
+                () -> service.addPartToTicket(ticketId, dto)
+        );
+
+        assertEquals("Cannot add parts to a closed ticket", ex.getMessage());
+        verify(ticketPartRepository, never()).save(any(TicketPart.class));
+        verify(inventoryRepository, never()).save(any(Inventory.class));
     }
 
     @Test

@@ -3,8 +3,7 @@ name: Backend CI
 on:
   push:
     branches:
-      - "**"
-  pull_request:
+      - main
 
 jobs:
   build-and-test:

@@ -6,6 +6,7 @@ import com.fixpoint.business.ticketparts.dto.AddTicketPartDTO;
 import com.fixpoint.business.ticketparts.dto.TicketPartDTO;
 import com.fixpoint.business.ticketparts.entity.TicketPart;
 import com.fixpoint.business.ticketparts.repository.TicketPartRepository;
+import com.fixpoint.business.tickets.domain.TicketStatus;
 import com.fixpoint.business.tickets.entity.Ticket;
 import com.fixpoint.business.tickets.repository.TicketRepository;
 import com.fixpoint.business.tickets.service.TicketServiceImpl;
@@ -14,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -34,6 +36,11 @@ public class TicketPartService {
         Ticket ticket = ticketRepository.findById(ticketId)
                 .orElseThrow(() -> new EntityNotFoundException(TicketServiceImpl.TICKET_NOT_FOUND));
 
+        TicketStatus ticketStatus = TicketStatus.parse(ticket.getStatus());
+        if (ticketStatus.isClosed()) {
+            throw new IllegalStateException("Cannot add parts to a closed ticket");
+        }
+
         Inventory inventory = inventoryRepository.findById(dto.inventoryId())
                 .orElseThrow(() -> new EntityNotFoundException(INVENTORY_ITEM_NOT_FOUND));
 
@@ -52,6 +59,10 @@ public class TicketPartService {
                 .build();
 
         TicketPart saved = ticketPartRepository.save(part);
+
+        ticket.setLastUpdated(LocalDateTime.now());
+        ticketRepository.save(ticket);
+
         return toDTO(saved);
     }
 
@@ -64,7 +75,7 @@ public class TicketPartService {
         return new TicketPartDTO(
                 part.getId(),
                 part.getInventory().getId(),
-                part.getInventory().getName(),  // asumo que Inventory tiene `name`
+                part.getInventory().getName(),
                 part.getQuantity(),
                 part.getNote()
         );

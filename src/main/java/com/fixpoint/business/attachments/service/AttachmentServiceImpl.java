@@ -3,6 +3,7 @@ package com.fixpoint.business.attachments.service;
 import com.fixpoint.business.attachments.entity.Attachment;
 import com.fixpoint.business.attachments.dto.AttachmentDTO;
 import com.fixpoint.business.attachments.repository.AttachmentRepository;
+import com.fixpoint.business.tickets.domain.TicketStatus;
 import com.fixpoint.business.tickets.entity.Ticket;
 import com.fixpoint.business.tickets.repository.TicketRepository;
 import com.fixpoint.business.tickets.service.TicketServiceImpl;
@@ -62,6 +63,7 @@ public class AttachmentServiceImpl implements AttachmentService {
     public AttachmentDTO uploadFile(Long ticketId, MultipartFile file, String fileType) {
         Ticket ticket = ticketRepo.findById(ticketId)
                 .orElseThrow(() -> new EntityNotFoundException(TicketServiceImpl.TICKET_NOT_FOUND));
+        ensureTicketIsOpen(ticket, "upload attachments");
 
         String originalFilename = Objects.requireNonNull(file.getOriginalFilename(), ORIGINAL_FILENAME_MUST_NOT_BE_NULL);
         String storedFileName = fileStorageService.storeFile(file);
@@ -87,6 +89,7 @@ public class AttachmentServiceImpl implements AttachmentService {
     public void delete(Long id) {
         Attachment attachment = attachmentRepo.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException(ATTACHMENT_NOT_FOUND));
+        ensureTicketIsOpen(attachment.getTicket(), "delete attachments");
 
         fileStorageService.deleteFile(attachment.getFilepath());
         attachmentRepo.delete(attachment);
@@ -96,6 +99,7 @@ public class AttachmentServiceImpl implements AttachmentService {
     public AttachmentDTO replaceFile(Long id, MultipartFile file) {
         Attachment attachment = attachmentRepo.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException(ATTACHMENT_NOT_FOUND));
+        ensureTicketIsOpen(attachment.getTicket(), "replace attachments");
 
         // Delete old file
         fileStorageService.deleteFile(attachment.getFilepath());
@@ -109,6 +113,13 @@ public class AttachmentServiceImpl implements AttachmentService {
         attachment.setFilepath(storedFileName);
 
         return toDto(attachmentRepo.save(attachment));
+    }
+
+    private void ensureTicketIsOpen(Ticket ticket, String action) {
+        TicketStatus status = TicketStatus.parse(ticket.getStatus());
+        if (status.isClosed()) {
+            throw new IllegalStateException("Cannot " + action + " for a closed ticket");
+        }
     }
 
     private AttachmentDTO toDto(Attachment attachment) {

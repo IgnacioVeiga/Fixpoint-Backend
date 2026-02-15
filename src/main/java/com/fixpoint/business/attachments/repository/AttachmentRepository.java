@@ -10,4 +10,5 @@ import java.util.List;
 @Repository
 public interface AttachmentRepository extends JpaRepository<Attachment, Long> {
     List<Attachment> findByTicket(Ticket ticket);
+    boolean existsByTicketId(Long ticketId);
 }

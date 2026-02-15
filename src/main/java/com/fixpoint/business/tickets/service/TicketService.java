@@ -2,6 +2,7 @@ package com.fixpoint.business.tickets.service;
 
 import com.fixpoint.business.tickets.dto.CreateTicketDTO;
 import com.fixpoint.business.tickets.dto.TicketDTO;
+import com.fixpoint.business.tickets.dto.TicketStatusDefinitionDTO;
 
 import java.util.List;
 
@@ -13,4 +14,5 @@ public interface TicketService {
     void delete(Long id);
     List<TicketDTO> getByClientId(Long clientId);
     List<TicketDTO> getByStatus(String status);
+    List<TicketStatusDefinitionDTO> getStatusDefinitions();
 }
