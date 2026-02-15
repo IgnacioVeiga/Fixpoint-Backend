@@ -1,5 +1,6 @@
 package com.fixpoint.exceptions;
 
+import com.fixpoint.auth.exception.AuthenticationFailedException;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -45,6 +46,16 @@ class GlobalExceptionHandlerTest {
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertBody(response.getBody(), 400, "Bad Request", "Invalid quantity");
+    }
+
+    @Test
+    void handleAuthenticationFailureShouldReturn401Response() {
+        ResponseEntity<Map<String, Object>> response = handler.handleAuthenticationFailure(
+                new AuthenticationFailedException("Invalid or expired session")
+        );
+
+        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+        assertBody(response.getBody(), 401, "Unauthorized", "Invalid or expired session");
     }
 
     @Test

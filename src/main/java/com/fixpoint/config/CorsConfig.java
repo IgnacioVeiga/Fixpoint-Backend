@@ -6,6 +6,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 
@@ -18,14 +19,22 @@ public class CorsConfig {
     @Bean
     public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowCredentials(true); // Necesario con cookies http-only
-        config.setAllowedOrigins(List.of(allowedOrigins.split(","))); // Orígenes permitidos
+        config.setAllowCredentials(true);
+        config.setAllowedOrigins(resolveAllowedOrigins());
         config.addAllowedHeader("*");
         config.addAllowedMethod("*");
-        config.setMaxAge(3600L); // Cacheo del preflight
+        config.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return new CorsFilter(source);
+    }
+
+    private List<String> resolveAllowedOrigins() {
+        return List.of(allowedOrigins.split(","))
+                .stream()
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .toList();
     }
 }

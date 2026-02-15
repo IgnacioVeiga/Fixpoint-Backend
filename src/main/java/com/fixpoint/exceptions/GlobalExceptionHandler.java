@@ -1,5 +1,6 @@
 package com.fixpoint.exceptions;
 
+import com.fixpoint.auth.exception.AuthenticationFailedException;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -33,6 +34,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({IllegalArgumentException.class, ConstraintViolationException.class})
     public ResponseEntity<Map<String, Object>> handleBadRequest(Exception ex) {
         return buildErrorResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    @ExceptionHandler(AuthenticationFailedException.class)
+    public ResponseEntity<Map<String, Object>> handleAuthenticationFailure(AuthenticationFailedException ex) {
+        return buildErrorResponse(HttpStatus.UNAUTHORIZED, ex.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

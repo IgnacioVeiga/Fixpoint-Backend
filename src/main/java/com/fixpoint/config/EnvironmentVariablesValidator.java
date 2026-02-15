@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 @Slf4j
@@ -46,9 +47,11 @@ public class EnvironmentVariablesValidator implements ApplicationRunner {
                 errors,
                 "At least 32 characters"
         );
-        validateJwtExpiration(errors);
         validateDbUrl(dbUrl, errors);
         validateJwtSecret(jwtSecret, errors);
+        validateAccessTokenExpiration(errors);
+        validateRefreshTokenExpirations(errors);
+        validateRefreshCookieSettings(activeProfiles, errors);
 
         if (!errors.isEmpty()) {
             String message = buildValidationMessage(activeProfiles, errors);
@@ -100,19 +103,88 @@ public class EnvironmentVariablesValidator implements ApplicationRunner {
         }
     }
 
-    private void validateJwtExpiration(List<String> errors) {
-        String rawValue = environment.getProperty("JWT_EXPIRATION_SECONDS");
-        if (!StringUtils.hasText(rawValue)) {
+    private void validateAccessTokenExpiration(List<String> errors) {
+        validateOptionalPositiveLong(
+                "JWT_ACCESS_EXPIRATION_SECONDS",
+                "JWT_ACCESS_EXPIRATION_SECONDS must be a positive number.",
+                "JWT_ACCESS_EXPIRATION_SECONDS must be a valid integer.",
+                errors
+        );
+    }
+
+    private void validateRefreshTokenExpirations(List<String> errors) {
+        Long refreshExpirationSeconds = parseOptionalLong(
+                "AUTH_REFRESH_EXPIRATION_SECONDS",
+                "AUTH_REFRESH_EXPIRATION_SECONDS must be a positive number.",
+                "AUTH_REFRESH_EXPIRATION_SECONDS must be a valid integer.",
+                errors
+        );
+        Long refreshRememberExpirationSeconds = parseOptionalLong(
+                "AUTH_REFRESH_REMEMBER_EXPIRATION_SECONDS",
+                "AUTH_REFRESH_REMEMBER_EXPIRATION_SECONDS must be a positive number.",
+                "AUTH_REFRESH_REMEMBER_EXPIRATION_SECONDS must be a valid integer.",
+                errors
+        );
+
+        if (refreshExpirationSeconds != null
+                && refreshRememberExpirationSeconds != null
+                && refreshRememberExpirationSeconds < refreshExpirationSeconds) {
+            errors.add("AUTH_REFRESH_REMEMBER_EXPIRATION_SECONDS must be greater than or equal to AUTH_REFRESH_EXPIRATION_SECONDS.");
+        }
+    }
+
+    private void validateRefreshCookieSettings(Set<String> activeProfiles, List<String> errors) {
+        String sameSite = environment.getProperty("security.auth.refresh.cookie.same-site", "Lax")
+                .trim()
+                .toLowerCase(Locale.ROOT);
+        boolean validSameSite = Set.of("lax", "strict", "none").contains(sameSite);
+        if (!validSameSite) {
+            errors.add("security.auth.refresh.cookie.same-site must be one of: Lax, Strict, None.");
             return;
+        }
+
+        boolean secureCookie = Boolean.parseBoolean(
+                environment.getProperty("security.auth.refresh.cookie.secure", "false")
+        );
+        if ("none".equals(sameSite) && !secureCookie) {
+            if (activeProfiles.contains("dev")) {
+                log.warn("Refresh cookie SameSite=None with secure=false may be rejected by browsers outside localhost.");
+            } else {
+                errors.add("security.auth.refresh.cookie.secure must be true when SameSite=None.");
+            }
+        }
+    }
+
+    private void validateOptionalPositiveLong(
+            String variableName,
+            String nonPositiveMessage,
+            String parseErrorMessage,
+            List<String> errors
+    ) {
+        parseOptionalLong(variableName, nonPositiveMessage, parseErrorMessage, errors);
+    }
+
+    private Long parseOptionalLong(
+            String variableName,
+            String nonPositiveMessage,
+            String parseErrorMessage,
+            List<String> errors
+    ) {
+        String rawValue = environment.getProperty(variableName);
+        if (!StringUtils.hasText(rawValue)) {
+            return null;
         }
 
         try {
             long parsedValue = Long.parseLong(rawValue.trim());
             if (parsedValue <= 0) {
-                errors.add("JWT_EXPIRATION_SECONDS must be a positive number.");
+                errors.add(nonPositiveMessage);
+                return null;
             }
+            return parsedValue;
         } catch (NumberFormatException ex) {
-            errors.add("JWT_EXPIRATION_SECONDS must be a valid integer.");
+            errors.add(parseErrorMessage);
+            return null;
         }
     }
 

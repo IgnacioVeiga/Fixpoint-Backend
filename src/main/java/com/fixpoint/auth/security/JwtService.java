@@ -7,11 +7,13 @@ import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
+import java.util.UUID;
 
 @Service
 public class JwtService {
@@ -19,23 +21,28 @@ public class JwtService {
     @Value("${security.jwt.secret}")
     private String jwtSecret;
 
-    @Value("${security.jwt.expiration-seconds:43200}")
-    private long jwtExpirationSeconds;
+    @Value("${security.jwt.access-expiration-seconds:900}")
+    private long jwtAccessExpirationSeconds;
 
     @PostConstruct
-    public void validateSecretLength() {
+    public void validateConfiguration() {
         if (jwtSecret == null || jwtSecret.length() < 32) {
             throw new IllegalStateException("security.jwt.secret must have at least 32 characters");
+        }
+        if (jwtAccessExpirationSeconds <= 0) {
+            throw new IllegalStateException("security.jwt.access-expiration-seconds must be positive");
         }
     }
 
     public String generateToken(AppUserPrincipal principal) {
         Instant now = Instant.now();
-        Instant expiresAt = now.plusSeconds(jwtExpirationSeconds);
+        Instant expiresAt = now.plusSeconds(jwtAccessExpirationSeconds);
 
         return Jwts.builder()
                 .subject(principal.getUsername())
                 .claim("role", principal.getRole().name())
+                .claim("uid", principal.getId())
+                .id(UUID.randomUUID().toString())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expiresAt))
                 .signWith(getSigningKey())
@@ -48,11 +55,14 @@ public class JwtService {
 
     public boolean isTokenValid(String token, UserDetails userDetails) {
         String username = extractUsername(token);
-        return username.equals(userDetails.getUsername()) && !isTokenExpired(token);
+        return StringUtils.hasText(username)
+                && username.equals(userDetails.getUsername())
+                && userDetails.isEnabled()
+                && !isTokenExpired(token);
     }
 
     public Instant computeExpirationInstant() {
-        return Instant.now().plusSeconds(jwtExpirationSeconds);
+        return Instant.now().plusSeconds(jwtAccessExpirationSeconds);
     }
 
     private boolean isTokenExpired(String token) {

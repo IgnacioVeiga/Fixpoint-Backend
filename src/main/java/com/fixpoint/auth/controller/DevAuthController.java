@@ -3,6 +3,7 @@ package com.fixpoint.auth.controller;
 import com.fixpoint.auth.dto.AuthTokenResponse;
 import com.fixpoint.auth.dto.RegisterRequest;
 import com.fixpoint.auth.service.AuthService;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Profile;
@@ -20,7 +21,10 @@ public class DevAuthController {
     private final AuthService authService;
 
     @PostMapping("/register")
-    public AuthTokenResponse register(@Valid @RequestBody RegisterRequest request) {
-        return authService.registerForDev(request);
+    public AuthTokenResponse register(
+            @Valid @RequestBody RegisterRequest request,
+            HttpServletResponse response
+    ) {
+        return authService.registerForDev(request, response);
     }
 }

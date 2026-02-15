@@ -20,10 +20,12 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import jakarta.servlet.http.Cookie;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
+import java.util.Objects;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -107,7 +109,8 @@ class ApiIntegrationTest {
                 .andExpect(jsonPath("$.tokenType").value("Bearer"))
                 .andExpect(jsonPath("$.accessToken").isString())
                 .andExpect(jsonPath("$.username").value(username))
-                .andExpect(jsonPath("$.role").value("TECH"));
+                .andExpect(jsonPath("$.role").value("TECH"))
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("fixpoint_refresh_token=")));
 
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -121,7 +124,8 @@ class ApiIntegrationTest {
                 .andExpect(jsonPath("$.tokenType").value("Bearer"))
                 .andExpect(jsonPath("$.accessToken").isString())
                 .andExpect(jsonPath("$.username").value(username))
-                .andExpect(jsonPath("$.role").value("TECH"));
+                .andExpect(jsonPath("$.role").value("TECH"))
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("fixpoint_refresh_token=")));
     }
 
     @Test
@@ -137,8 +141,68 @@ class ApiIntegrationTest {
                                   "password": "wrong-password"
                                 }
                                 """.formatted(username)))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.message").value("Invalid username or password"));
+    }
+
+    @Test
+    void shouldRotateRefreshCookieAndIssueNewAccessToken() throws Exception {
+        String username = "refresh-user-" + System.nanoTime();
+        registerUser(username, DEFAULT_PASSWORD);
+
+        MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "%s",
+                                  "password": "%s"
+                                }
+                                """.formatted(username, DEFAULT_PASSWORD)))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("fixpoint_refresh_token=")))
+                .andReturn();
+
+        String previousRefreshToken = readRefreshCookieValue(loginResult);
+
+        MvcResult refreshResult = mockMvc.perform(post("/api/auth/refresh")
+                        .cookie(new Cookie("fixpoint_refresh_token", previousRefreshToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.accessToken").isString())
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("fixpoint_refresh_token=")))
+                .andReturn();
+
+        String newRefreshToken = readRefreshCookieValue(refreshResult);
+        org.junit.jupiter.api.Assertions.assertNotEquals(previousRefreshToken, newRefreshToken);
+    }
+
+    @Test
+    void logoutShouldRevokeRefreshToken() throws Exception {
+        String username = "logout-user-" + System.nanoTime();
+        registerUser(username, DEFAULT_PASSWORD);
+
+        MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "%s",
+                                  "password": "%s"
+                                }
+                                """.formatted(username, DEFAULT_PASSWORD)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String refreshToken = readRefreshCookieValue(loginResult);
+
+        mockMvc.perform(post("/api/auth/logout")
+                        .cookie(new Cookie("fixpoint_refresh_token", refreshToken)))
+                .andExpect(status().isNoContent())
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("Max-Age=0")));
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .cookie(new Cookie("fixpoint_refresh_token", refreshToken)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Invalid or expired session"));
     }
 
     @Test
@@ -503,6 +567,20 @@ class ApiIntegrationTest {
     private long readId(MvcResult result) throws Exception {
         JsonNode root = objectMapper.readTree(result.getResponse().getContentAsString());
         return root.path("id").asLong();
+    }
+
+    private String readRefreshCookieValue(MvcResult result) {
+        String setCookie = result.getResponse().getHeader(HttpHeaders.SET_COOKIE);
+        if (setCookie == null || !setCookie.contains("=")) {
+            throw new IllegalStateException("Missing refresh Set-Cookie header");
+        }
+
+        String[] keyValue = setCookie.split(";", 2)[0].split("=", 2);
+        if (keyValue.length != 2 || !Objects.equals("fixpoint_refresh_token", keyValue[0])) {
+            throw new IllegalStateException("Invalid refresh Set-Cookie header format");
+        }
+
+        return keyValue[1];
     }
 
     private void cleanUploadDirectory() {

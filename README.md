@@ -25,7 +25,14 @@ Base común (`application.properties`):
 - `FILE_UPLOAD_DIR`
 - `APP_TIMEZONE`
 - `JWT_SECRET`
-- `JWT_EXPIRATION_SECONDS`
+- `JWT_ACCESS_EXPIRATION_SECONDS` (short-lived access token)
+- `AUTH_REFRESH_EXPIRATION_SECONDS`
+- `AUTH_REFRESH_REMEMBER_EXPIRATION_SECONDS`
+- `AUTH_REFRESH_COOKIE_NAME`
+- `AUTH_REFRESH_COOKIE_PATH`
+- `AUTH_REFRESH_COOKIE_SAME_SITE` (`Lax`/`Strict`/`None`)
+- `AUTH_REFRESH_COOKIE_SECURE`
+- `AUTH_REFRESH_COOKIE_DOMAIN`
 - `AUTH_BOOTSTRAP_ADMIN_USERNAME` (prod only)
 - `AUTH_BOOTSTRAP_ADMIN_PASSWORD_HASH` (prod only)
 - `AUTH_BOOTSTRAP_ADMIN_ROLE` (prod only, `ADMIN`/`TECH`)
@@ -50,8 +57,12 @@ Cada una levanta `com.fixpoint.FixpointApplication` usando su archivo `.env.*`.
 
 ## Authentication flow
 
-- `POST /api/auth/login`: available in all environments.
+- `POST /api/auth/login`: validates credentials and returns a short-lived access token.
+- `POST /api/auth/refresh`: rotates refresh cookie and returns a new access token.
+- `POST /api/auth/logout`: revokes current refresh session and clears refresh cookie.
 - `POST /api/auth/register`: available only in `dev` profile.
+- Access token is sent in `Authorization: Bearer ...`.
+- Refresh token is stored in an `HttpOnly` cookie (`fixpoint_refresh_token` by default).
 - Production user provisioning is handled by Flyway SQL (`src/main/resources/db/migration/prod/V0_3__Bootstrap_prod_users.sql`).
 - Dev bootstrap user is seeded by Flyway (`src/main/resources/db/migration/dev/V0_3__Bootstrap_dev_users.sql`) with:
   - username: `admin`
