@@ -10,7 +10,6 @@ cookie-based refresh sessions.
 - Authentication:
   - short-lived access token (`Bearer`)
   - HttpOnly refresh cookie with rotation + server-side revocation
-- Backend `mock` profile was intentionally removed (mock mode is frontend-only)
 
 ## Quick Start
 

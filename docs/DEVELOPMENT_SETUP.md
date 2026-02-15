@@ -62,8 +62,6 @@ For detailed error patterns and concrete fixes, see `docs/TROUBLESHOOTING.md`.
 - `qa`: QA infrastructure profile
 - `prod`: production profile
 
-The backend no longer has a `mock` profile. Mock mode exists only in the frontend.
-
 ## 6. Migrations
 
 Migration folders:
