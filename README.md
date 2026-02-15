@@ -1,128 +1,62 @@
 # Fixpoint Backend
 
-## Perfiles de entorno
+Spring Boot API for workshop operations (tickets, clients, inventory, attachments) with JWT access tokens and
+cookie-based refresh sessions.
 
-- `dev`: desarrollo local con PostgreSQL.
-- `qa`: pruebas contra infraestructura de QA.
-- `prod`: producción.
+## Scope
 
-Nota: el modo `mock` queda solo en frontend. El backend ya no mantiene perfil `mock`.
+- Profiles: `dev`, `qa`, `prod`
+- Database: PostgreSQL + Flyway
+- Authentication:
+  - short-lived access token (`Bearer`)
+  - HttpOnly refresh cookie with rotation + server-side revocation
+- Backend `mock` profile was intentionally removed (mock mode is frontend-only)
 
-Archivos asociados:
+## Quick Start
 
-- `src/main/resources/application-dev.properties`
-- `src/main/resources/application-qa.properties`
-- `src/main/resources/application-prod.properties`
+1. Copy `.env.example` to `.env.dev`
+2. Fill values for your local/cloud DB and JWT secret
+3. Run `Backend - Dev` (IntelliJ) or CLI
+4. Confirm logs show:
+  - Flyway migration success
+  - `Environment validation passed`
 
-## Variables de entorno
+## Start Here (Docs)
 
-Base común (`application.properties`):
+- `docs/DEVELOPMENT_SETUP.md` - setup, startup checks, profile behavior
+- `docs/ENVIRONMENT_VARIABLES.md` - canonical env var reference by context
+- `docs/AUTHENTICATION.md` - login/refresh/logout design and token lifecycle
+- `docs/USER_PROVISIONING.md` - how to create users in dev and prod safely
+- `docs/TROUBLESHOOTING.md` - common startup/auth/CORS issues and fixes
+- `BRANCH_PROTECTION_CHECKLIST.md` - repository governance checklist
 
-- `DB_URL`
-- `DB_USERNAME`
-- `DB_PASSWORD`
-- `CORS_ALLOWED_ORIGINS`
-- `FILE_UPLOAD_DIR`
-- `APP_TIMEZONE`
-- `JWT_SECRET`
-- `JWT_ACCESS_EXPIRATION_SECONDS` (short-lived access token)
-- `AUTH_REFRESH_EXPIRATION_SECONDS`
-- `AUTH_REFRESH_REMEMBER_EXPIRATION_SECONDS`
-- `AUTH_REFRESH_COOKIE_NAME`
-- `AUTH_REFRESH_COOKIE_PATH`
-- `AUTH_REFRESH_COOKIE_SAME_SITE` (`Lax`/`Strict`/`None`)
-- `AUTH_REFRESH_COOKIE_SECURE`
-- `AUTH_REFRESH_COOKIE_DOMAIN`
-- `AUTH_BOOTSTRAP_ADMIN_USERNAME` (prod only)
-- `AUTH_BOOTSTRAP_ADMIN_PASSWORD_HASH` (prod only)
-- `AUTH_BOOTSTRAP_ADMIN_ROLE` (prod only, `ADMIN`/`TECH`)
+## Environment File Policy
 
-## Política de archivos `.env`
-
-- Solo `.env.example` debe existir en el repositorio.
-- Cada desarrollador crea localmente sus propios archivos:
+- Only `.env.example` is tracked in git
+- Real files are local-only and ignored:
   - `.env.dev`
   - `.env.qa`
   - `.env.prod`
-- Los archivos `.env.*` están ignorados por git y no deben commitearse.
-- Las run configurations de IntelliJ en `.run/` ya apuntan al patrón `.env.<entorno>`.
+- Never commit real credentials or secrets
 
-## IntelliJ IDEA
+## IntelliJ Run Configurations
 
-Hay run configurations compartidas en `.run/`:
+Shared run configs live in `.run/`:
 
 - `Backend - Dev`
 - `Backend - QA`
 - `Backend - Prod`
 
-Cada una levanta `com.fixpoint.FixpointApplication` usando su archivo `.env.*`.
+Each config reads `.env.<profile>` from project root.
 
-## Authentication flow
-
-- `POST /api/auth/login`: validates credentials and returns a short-lived access token.
-- `POST /api/auth/refresh`: rotates refresh cookie and returns a new access token.
-- `POST /api/auth/logout`: revokes current refresh session and clears refresh cookie.
-- `POST /api/auth/register`: available only in `dev` profile.
-- Access token is sent in `Authorization: Bearer ...`.
-- Refresh token is stored in an `HttpOnly` cookie (`fixpoint_refresh_token` by default).
-- Production user provisioning is handled by Flyway SQL (`src/main/resources/db/migration/prod/V0_3__Bootstrap_prod_users.sql`).
-- Dev bootstrap user is seeded by Flyway (`src/main/resources/db/migration/dev/V0_3__Bootstrap_dev_users.sql`) with:
-  - username: `admin`
-  - password: `admin123456`
-  - role: `ADMIN`
-
-For `prod`, bootstrap credentials are injected via environment variables:
-- `AUTH_BOOTSTRAP_ADMIN_USERNAME`
-- `AUTH_BOOTSTRAP_ADMIN_PASSWORD_HASH` (bcrypt hash, not plain password)
-- `AUTH_BOOTSTRAP_ADMIN_ROLE` (`ADMIN` or `TECH`)
-
-## Flyway migration layout
-
-- `src/main/resources/db/migration/common`: shared schema/data migrations for every environment.
-- `src/main/resources/db/migration/dev`: dev-only migrations.
-- `src/main/resources/db/migration/qa`: QA-only migrations.
-- `src/main/resources/db/migration/prod`: prod-only migrations.
-
-Active locations by profile:
-
-- `dev`: `common + dev`
-- `qa`: `common + qa`
-- `prod`: `common + prod`
-
-Bootstrap behavior for empty databases:
-
-- Flyway is configured to create schema `public` automatically (`spring.flyway.create-schemas=true`).
-- Base schema/tables are created from `common` migrations without assuming pre-existing schemas.
-
-## Dev Profile with Cloud PostgreSQL
-
-Minimum required environment variables for `dev`:
-
-- `DB_URL` (example: `jdbc:postgresql://db-host:5432/fixpoint?sslmode=require`)
-- `DB_USERNAME`
-- `DB_PASSWORD`
-- `JWT_SECRET` (minimum 32 chars)
-
-If any of these are missing, startup now fails fast with a clear validation message.
-
-## Comandos
+## Useful Commands
 
 ```bash
 ./mvnw test
 ./mvnw -DskipTests package
 ```
 
-## Unit tests included
-
-- `TicketPartServiceTest`: stock validation and DTO mapping.
-- `InventoryServiceImplTest`: delete guard when inventory is linked to ticket parts.
-- `GlobalExceptionHandlerTest`: HTTP status and response payload mapping.
-- `ApiIntegrationTest`: MockMvc integration tests for tickets, inventory, ticket parts, and global error mapping.
-
 ## CI
 
-GitHub Actions workflow: `.github/workflows/ci.yml` runs tests and package build only on commits to `main`.
-
-## Branch protection
-
-Use `BRANCH_PROTECTION_CHECKLIST.md` before enabling/adjusting rules for `main`.
+- Workflow: `.github/workflows/ci.yml`
+- Trigger policy: runs on commits to `main`
