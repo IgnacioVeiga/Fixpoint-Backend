@@ -53,6 +53,15 @@ Cada una levanta `com.fixpoint.FixpointApplication` usando su archivo `.env.*`.
 - `POST /api/auth/login`: available in all environments.
 - `POST /api/auth/register`: available only in `dev` profile.
 - Production user provisioning is handled by Flyway SQL (`src/main/resources/db/migration/prod/V0_3__Bootstrap_prod_users.sql`).
+- Dev bootstrap user is seeded by Flyway (`src/main/resources/db/migration/dev/V0_3__Bootstrap_dev_users.sql`) with:
+  - username: `admin`
+  - password: `admin123456`
+  - role: `ADMIN`
+
+For `prod`, bootstrap credentials are injected via environment variables:
+- `AUTH_BOOTSTRAP_ADMIN_USERNAME`
+- `AUTH_BOOTSTRAP_ADMIN_PASSWORD_HASH` (bcrypt hash, not plain password)
+- `AUTH_BOOTSTRAP_ADMIN_ROLE` (`ADMIN` or `TECH`)
 
 ## Flyway migration layout
 
