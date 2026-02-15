@@ -5,14 +5,14 @@
 - `dev`: desarrollo local con PostgreSQL.
 - `qa`: pruebas contra infraestructura de QA.
 - `prod`: producción.
-- `mock`: ejecución demo sin PostgreSQL (H2 en memoria).
+
+Nota: el modo `mock` queda solo en frontend. El backend ya no mantiene perfil `mock`.
 
 Archivos asociados:
 
 - `src/main/resources/application-dev.properties`
 - `src/main/resources/application-qa.properties`
 - `src/main/resources/application-prod.properties`
-- `src/main/resources/application-mock.properties`
 
 ## Variables de entorno
 
@@ -37,12 +37,15 @@ Base común (`application.properties`):
 - `AUTH_BOOTSTRAP_ADMIN_PASSWORD_HASH` (prod only)
 - `AUTH_BOOTSTRAP_ADMIN_ROLE` (prod only, `ADMIN`/`TECH`)
 
-Plantillas por entorno para IntelliJ:
+## Política de archivos `.env`
 
-- `.env.dev`
-- `.env.qa`
-- `.env.prod`
-- `.env.mock`
+- Solo `.env.example` debe existir en el repositorio.
+- Cada desarrollador crea localmente sus propios archivos:
+  - `.env.dev`
+  - `.env.qa`
+  - `.env.prod`
+- Los archivos `.env.*` están ignorados por git y no deben commitearse.
+- Las run configurations de IntelliJ en `.run/` ya apuntan al patrón `.env.<entorno>`.
 
 ## IntelliJ IDEA
 
@@ -51,7 +54,6 @@ Hay run configurations compartidas en `.run/`:
 - `Backend - Dev`
 - `Backend - QA`
 - `Backend - Prod`
-- `Backend - Mock`
 
 Cada una levanta `com.fixpoint.FixpointApplication` usando su archivo `.env.*`.
 
@@ -86,7 +88,6 @@ Active locations by profile:
 - `dev`: `common + dev`
 - `qa`: `common + qa`
 - `prod`: `common + prod`
-- `mock`: Flyway disabled
 
 Bootstrap behavior for empty databases:
 

@@ -11,9 +11,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class EnvironmentVariablesValidatorTest {
 
     @Test
-    void shouldSkipValidationForMockProfile() {
+    void shouldSkipValidationForNonExternalDbProfile() {
         MockEnvironment environment = new MockEnvironment();
-        environment.setActiveProfiles("mock");
+        environment.setActiveProfiles("local");
 
         EnvironmentVariablesValidator validator = new EnvironmentVariablesValidator(environment);
 
