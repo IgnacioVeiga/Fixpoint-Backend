@@ -7,6 +7,7 @@
 
 CREATE SCHEMA IF NOT EXISTS public;
 SET search_path TO public;
+SET TIMEZONE = '${APP_TIMEZONE}';
 
 -- =====================
 -- Clientes del sistema
