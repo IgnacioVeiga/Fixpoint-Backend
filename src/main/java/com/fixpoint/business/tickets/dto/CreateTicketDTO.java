@@ -2,6 +2,7 @@ package com.fixpoint.business.tickets.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 
 public record CreateTicketDTO(
@@ -12,7 +13,7 @@ public record CreateTicketDTO(
         String serialNumber,
         LocalDate entryDate,
         String problemDescription,
-        String status,
+        @Size(max = 30) String status,
         boolean needsContract,
         boolean contractSigned,
         String createdBy
