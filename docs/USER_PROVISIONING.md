@@ -5,8 +5,8 @@ This document describes supported ways to create application users per environme
 ## Summary by Profile
 
 - `dev`:
-  - preferred: `POST /api/auth/register` (dev-only endpoint)
-  - optional: dev bootstrap migration (`src/main/resources/db/migration/dev/V0_3__Bootstrap_dev_users.sql`)
+  - preferred: `POST /api/v1/auth/register` (dev-only endpoint)
+  - optional: dev bootstrap migration (`src/main/resources/db/migration/dev/V101__bootstrap_dev_users.sql`)
 - `qa`:
   - manual SQL or QA-only migration when needed
 - `prod`:
@@ -17,7 +17,7 @@ This document describes supported ways to create application users per environme
 
 Endpoint:
 
-- `POST /api/auth/register`
+- `POST /api/v1/auth/register`
 
 Behavior:
 
@@ -29,7 +29,7 @@ Behavior:
 
 File:
 
-- `src/main/resources/db/migration/dev/V0_3__Bootstrap_dev_users.sql`
+- `src/main/resources/db/migration/dev/V101__bootstrap_dev_users.sql`
 
 Current seed user:
 
@@ -42,7 +42,7 @@ This migration is development-only and should never be reused in production.
 
 File:
 
-- `src/main/resources/db/migration/prod/V0_3__Bootstrap_prod_users.sql`
+- `src/main/resources/db/migration/prod/V301__bootstrap_prod_users.sql`
 
 Required env vars:
 
@@ -61,7 +61,7 @@ The migration inserts only when:
 
 Recommended workflow:
 
-1. In `dev`, call `POST /api/auth/register` with the target password.
+1. In `dev`, call `POST /api/v1/auth/register` with the target password.
 2. Read the generated `password_hash` from table `app_users`.
 3. Reuse that hash value for `AUTH_BOOTSTRAP_ADMIN_PASSWORD_HASH` in prod deployment.
 

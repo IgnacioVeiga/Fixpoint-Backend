@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/tickets/{ticketId}/parts")
+@RequestMapping("/api/v1/tickets/{ticketId}/parts")
 @RequiredArgsConstructor
 public class TicketPartController {
 

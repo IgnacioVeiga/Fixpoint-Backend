@@ -1,6 +1,9 @@
 name: Backend CI
 
 on:
+  pull_request:
+    branches:
+      - main
   push:
     branches:
       - main
@@ -20,8 +23,11 @@ jobs:
           java-version: "21"
           cache: maven
 
+      - name: Ensure Maven wrapper is executable
+        run: chmod +x mvnw
+
       - name: Run unit tests
-        run: bash ./mvnw test
+        run: ./mvnw test
 
       - name: Package application
-        run: bash ./mvnw -DskipTests package
+        run: ./mvnw -DskipTests package

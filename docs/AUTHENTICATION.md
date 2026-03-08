@@ -24,7 +24,7 @@
 
 ## Endpoints
 
-### `POST /api/auth/login`
+### `POST /api/v1/auth/login`
 
 - Input:
   - `username`
@@ -37,7 +37,7 @@
   - `200` success
   - `401` invalid credentials
 
-### `POST /api/auth/refresh`
+### `POST /api/v1/auth/refresh`
 
 - Input:
   - Refresh cookie only
@@ -50,7 +50,7 @@ If cookie is invalid/expired/revoked:
 - Returns `401`
 - Sends clear-cookie header
 
-### `POST /api/auth/logout`
+### `POST /api/v1/auth/logout`
 
 - Input:
   - Refresh cookie only
@@ -60,7 +60,7 @@ If cookie is invalid/expired/revoked:
 - Typical status:
   - `204` (idempotent logout behavior)
 
-### `POST /api/auth/register` (dev only)
+### `POST /api/v1/auth/register` (dev only)
 
 - Enabled only in `dev`
 - Creates user with role `TECH`
@@ -77,7 +77,7 @@ If cookie is invalid/expired/revoked:
 ## Frontend Reload Behavior
 
 - Access token is usually kept in frontend memory, so browser reload may clear it.
-- Frontend can recover auth by calling `/api/auth/refresh` if refresh cookie is still valid.
+- Frontend can recover auth by calling `/api/v1/auth/refresh` if refresh cookie is still valid.
 - If refresh fails, user is considered logged out.
 
 ## Session Storage Model

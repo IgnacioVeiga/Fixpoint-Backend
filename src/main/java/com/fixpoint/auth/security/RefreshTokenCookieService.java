@@ -18,7 +18,7 @@ public class RefreshTokenCookieService {
     @Value("${security.auth.refresh.cookie.name:fixpoint_refresh_token}")
     private String refreshCookieName;
 
-    @Value("${security.auth.refresh.cookie.path:/api/auth}")
+    @Value("${security.auth.refresh.cookie.path:/api/v1/auth}")
     private String refreshCookiePath;
 
     @Value("${security.auth.refresh.cookie.same-site:Lax}")

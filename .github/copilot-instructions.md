@@ -6,7 +6,7 @@ Human onboarding and operational documentation are in `docs/`.
 ## 1. Repository Identity
 
 - Stack: Spring Boot 3.5.x, Java 21, PostgreSQL, Flyway.
-- API style: REST under `/api/**`.
+- API style: REST under `/api/v1/**`.
 - Profiles: `dev`, `qa`, `prod`.
 - CI trigger: runs on commits to `main` (`.github/workflows/ci.yml`).
 
@@ -53,10 +53,10 @@ Human onboarding and operational documentation are in `docs/`.
 
 - Security is stateless (`SessionCreationPolicy.STATELESS`).
 - Public auth endpoints:
-  - `POST /api/auth/login`
-  - `POST /api/auth/refresh`
-  - `POST /api/auth/logout`
-  - `POST /api/auth/register` (controller active only in `dev` profile)
+  - `POST /api/v1/auth/login`
+  - `POST /api/v1/auth/refresh`
+  - `POST /api/v1/auth/logout`
+  - `POST /api/v1/auth/register` (controller active only in `dev` profile)
 - Keep cookie and CORS behavior consistent with frontend integration.
 - Preserve username normalization (lowercase, trimmed) unless explicitly changed.
 

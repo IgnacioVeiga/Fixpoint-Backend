@@ -1,6 +1,6 @@
 -- Authentication users for API access.
 -- User rows should be provisioned through:
--- - DEV: POST /api/auth/register
+-- - DEV: POST /api/v1/auth/register
 -- - QA/PROD: dedicated Flyway SQL scripts with BCrypt hashes.
 
 SET search_path TO public;

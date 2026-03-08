@@ -75,7 +75,7 @@ class AuthServiceTest {
         when(jwtService.computeExpirationInstant()).thenReturn(Instant.parse("2026-02-14T12:00:00Z"));
         when(refreshSessionRepository.save(any(RefreshSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(refreshTokenCookieService.buildRefreshCookieHeader(any(String.class), anyLong()))
-                .thenReturn("fixpoint_refresh_token=token-abc; Path=/api/auth; HttpOnly");
+                .thenReturn("fixpoint_refresh_token=token-abc; Path=/api/v1/auth; HttpOnly");
 
         AuthTokenResponse tokenResponse = authService.login(request, response);
 
@@ -84,7 +84,7 @@ class AuthServiceTest {
         assertEquals(OffsetDateTime.ofInstant(Instant.parse("2026-02-14T12:00:00Z"), ZoneOffset.UTC), tokenResponse.expiresAt());
         assertEquals("alice", tokenResponse.username());
         assertEquals("ADMIN", tokenResponse.role());
-        assertEquals("fixpoint_refresh_token=token-abc; Path=/api/auth; HttpOnly", response.getHeader("Set-Cookie"));
+        assertEquals("fixpoint_refresh_token=token-abc; Path=/api/v1/auth; HttpOnly", response.getHeader("Set-Cookie"));
     }
 
     @Test
@@ -116,7 +116,7 @@ class AuthServiceTest {
         });
         when(refreshSessionRepository.save(any(RefreshSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(refreshTokenCookieService.buildRefreshCookieHeader(any(String.class), anyLong()))
-                .thenReturn("fixpoint_refresh_token=token-xyz; Path=/api/auth; HttpOnly");
+                .thenReturn("fixpoint_refresh_token=token-xyz; Path=/api/v1/auth; HttpOnly");
         when(jwtService.generateToken(any(AppUserPrincipal.class))).thenReturn("new-token");
         when(jwtService.computeExpirationInstant()).thenReturn(Instant.parse("2026-02-14T13:00:00Z"));
 
@@ -125,7 +125,7 @@ class AuthServiceTest {
         assertEquals("newuser", tokenResponse.username());
         assertEquals("TECH", tokenResponse.role());
         assertEquals("new-token", tokenResponse.accessToken());
-        assertEquals("fixpoint_refresh_token=token-xyz; Path=/api/auth; HttpOnly", response.getHeader("Set-Cookie"));
+        assertEquals("fixpoint_refresh_token=token-xyz; Path=/api/v1/auth; HttpOnly", response.getHeader("Set-Cookie"));
         verify(passwordEncoder).encode("safe-pass-2026");
     }
 

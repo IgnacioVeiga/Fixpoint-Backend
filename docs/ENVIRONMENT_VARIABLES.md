@@ -67,7 +67,7 @@ Canonical runtime variable reference for `Fixpoint-Backend`.
 - `AUTH_REFRESH_COOKIE_NAME`
   - Default: `fixpoint_refresh_token`
 - `AUTH_REFRESH_COOKIE_PATH`
-  - Default: `/api/auth`
+  - Default: `/api/v1/auth`
 - `AUTH_REFRESH_COOKIE_SAME_SITE`
   - Allowed values: `Lax`, `Strict`, `None`
 - `AUTH_REFRESH_COOKIE_SECURE`

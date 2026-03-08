@@ -69,7 +69,7 @@ class GlobalExceptionHandlerTest {
     @Test
     void handleNoResourceFoundShouldReturn404Response() {
         ResponseEntity<Map<String, Object>> response = handler.handleNoResourceFound(
-                new NoResourceFoundException(HttpMethod.POST, "/api/auth/register")
+                new NoResourceFoundException(HttpMethod.POST, "/api/v1/auth/register")
         );
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());

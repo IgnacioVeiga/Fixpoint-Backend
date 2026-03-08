@@ -15,7 +15,7 @@ import org.springframework.validation.annotation.Validated;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/attachments")
+@RequestMapping("/api/v1/attachments")
 @RequiredArgsConstructor
 @Validated
 public class AttachmentController {
