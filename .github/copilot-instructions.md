@@ -93,6 +93,10 @@ Human onboarding and operational documentation are in `docs/`.
 
 - `README.md`
 - `docs/DEVELOPMENT_SETUP.md`
+- `docs/ENVIRONMENTS.md`
+- `docs/AUTH_FLOW.md`
+- `docs/MIGRATIONS.md`
+- `docs/PROJECT_MAP.md`
 - `docs/ENVIRONMENT_VARIABLES.md`
 - `docs/AUTHENTICATION.md`
 - `src/main/java/com/fixpoint/config/SecurityConfig.java`

@@ -23,6 +23,8 @@ Canonical runtime variable reference for `Fixpoint-Backend`.
 - `SPRING_PROFILES_ACTIVE`
   - Typical values: `dev`, `qa`, `prod`
   - Local recommendation: `dev`
+- `APP_ENV`
+  - Optional profile mirror used for app-level observability/log context
 
 ### Database
 
@@ -37,6 +39,8 @@ Canonical runtime variable reference for `Fixpoint-Backend`.
 - `CORS_ALLOWED_ORIGINS`
   - Comma-separated list of allowed frontend origins
   - Example: `http://localhost:4200,http://192.168.1.50:4200`
+- `LOG_SECURITY_LEVEL`
+  - Security logger level (for example `INFO`, `DEBUG`)
 
 ### File Storage and Time Zone
 

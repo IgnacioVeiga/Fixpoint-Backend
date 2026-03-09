@@ -20,9 +20,21 @@ cookie-based refresh sessions.
   - Flyway migration success
   - `Environment validation passed`
 
+Helper scripts:
+
+```bash
+./scripts/run.sh dev local
+./scripts/run.sh dev docker
+./scripts/run.sh dev auto
+```
+
 ## Start Here (Docs)
 
 - `docs/DEVELOPMENT_SETUP.md` - setup, startup checks, profile behavior
+- `docs/ENVIRONMENTS.md` - profile matrix and env conventions
+- `docs/AUTH_FLOW.md` - standardized auth/session flow summary
+- `docs/MIGRATIONS.md` - Flyway layout and migration rules
+- `docs/PROJECT_MAP.md` - source code navigation map
 - `docs/ENVIRONMENT_VARIABLES.md` - canonical env var reference by context
 - `docs/AUTHENTICATION.md` - login/refresh/logout design and token lifecycle
 - `docs/USER_PROVISIONING.md` - how to create users in dev and prod safely

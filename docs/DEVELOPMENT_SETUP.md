@@ -40,6 +40,14 @@ set +a
 ./mvnw spring-boot:run
 ```
 
+### Option C: Helper script
+
+```bash
+./scripts/run.sh dev local
+./scripts/run.sh dev docker
+./scripts/run.sh dev auto
+```
+
 ## 4. First Startup Checks
 
 On startup, verify:
