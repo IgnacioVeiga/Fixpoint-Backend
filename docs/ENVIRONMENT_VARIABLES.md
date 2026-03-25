@@ -46,6 +46,11 @@ Canonical runtime variable reference for `Fixpoint-Backend`.
 
 - `FILE_UPLOAD_DIR`
   - Relative or absolute path for uploaded files
+  - If this path points to another mounted disk or volume, dashboard capacity is resolved against that storage path, not against the OS disk where the app binaries live
+- `FILE_STORAGE_LIMIT_BYTES`
+  - Optional logical quota in bytes for dashboard capacity metrics
+  - Use when files live on another server, object storage, or a shared volume whose capacity should not be inferred from the local host
+  - Set `0` or leave empty to let the backend try filesystem capacity and fall back to logical usage only
 - `APP_TIMEZONE`
   - Server baseline timezone
   - Recommendation: `America/Argentina/Buenos_Aires`

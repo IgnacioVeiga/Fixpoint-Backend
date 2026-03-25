@@ -8,10 +8,11 @@ import java.util.List;
 
 public interface AttachmentService {
     List<AttachmentDTO> findByTicketId(Long ticketId);
+    List<AttachmentDTO> findRecent(int limit);
     AttachmentDTO findById(Long id);
     AttachmentDTO save(AttachmentDTO dto);
-    AttachmentDTO uploadFile(Long ticketId, MultipartFile file, String fileType);
+    AttachmentDTO uploadFile(Long ticketId, MultipartFile file, String tag);
     Resource downloadFile(Long id);
     void delete(Long id);
-    AttachmentDTO replaceFile(Long id, MultipartFile file);
+    AttachmentDTO replaceFile(Long id, MultipartFile file, String tag);
 }

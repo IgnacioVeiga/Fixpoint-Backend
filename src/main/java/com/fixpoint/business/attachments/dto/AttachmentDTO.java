@@ -14,5 +14,8 @@ public class AttachmentDTO {
     private String filename;
     private String filepath;
     private String fileType;
+    private String fileFormat;
+    private Long fileSizeBytes;
+    private String tag;
     private LocalDateTime uploadedAt;
 }

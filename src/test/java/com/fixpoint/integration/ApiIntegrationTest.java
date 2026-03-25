@@ -24,6 +24,7 @@ import jakarta.servlet.http.Cookie;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.Objects;
 
@@ -405,7 +406,7 @@ class ApiIntegrationTest {
 
         mockMvc.perform(multipart("/api/v1/attachments/upload/ticket/{ticketId}", ticketId)
                         .file(file)
-                        .param("fileType", "other")
+                        .param("tag", "Evidencia")
                         .header(HttpHeaders.AUTHORIZATION, bearerToken()))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").value("Cannot upload attachments for a closed ticket"));
@@ -422,16 +423,20 @@ class ApiIntegrationTest {
                 MediaType.TEXT_PLAIN_VALUE,
                 "diagnostic-content".getBytes()
         );
+        int expectedFileSize = file.getBytes().length;
 
         MvcResult uploadResult = mockMvc.perform(multipart("/api/v1/attachments/upload/ticket/{ticketId}", ticketId)
                         .file(file)
-                        .param("fileType", "other")
+                        .param("tag", "Diagnostico")
                         .header(HttpHeaders.AUTHORIZATION, bearerToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").isNumber())
                 .andExpect(jsonPath("$.ticketId").value(ticketId))
                 .andExpect(jsonPath("$.filename").value("diagnostic-note.txt"))
-                .andExpect(jsonPath("$.fileType").value("other"))
+                .andExpect(jsonPath("$.fileType").value("document"))
+                .andExpect(jsonPath("$.fileFormat").value("txt"))
+                .andExpect(jsonPath("$.fileSizeBytes").value(expectedFileSize))
+                .andExpect(jsonPath("$.tag").value("Diagnostico"))
                 .andReturn();
 
         long attachmentId = readId(uploadResult);
@@ -440,11 +445,14 @@ class ApiIntegrationTest {
                         .header(HttpHeaders.AUTHORIZATION, bearerToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(attachmentId))
-                .andExpect(jsonPath("$[0].filename").value("diagnostic-note.txt"));
+                .andExpect(jsonPath("$[0].filename").value("diagnostic-note.txt"))
+                .andExpect(jsonPath("$[0].fileFormat").value("txt"))
+                .andExpect(jsonPath("$[0].fileSizeBytes").value(expectedFileSize));
 
         mockMvc.perform(get("/api/v1/attachments/download/{id}", attachmentId)
                         .header(HttpHeaders.AUTHORIZATION, bearerToken()))
                 .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_TYPE, containsString(MediaType.TEXT_PLAIN_VALUE)))
                 .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, containsString("diagnostic-note.txt")))
                 .andExpect(content().bytes("diagnostic-content".getBytes()));
 
@@ -456,6 +464,84 @@ class ApiIntegrationTest {
                         .header(HttpHeaders.AUTHORIZATION, bearerToken()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("Attachment not found"));
+    }
+
+    @Test
+    void shouldExposeRecentAttachmentsAndDashboardSummary() throws Exception {
+        long clientId = createClient("Dashboard Client");
+        String today = LocalDate.now().toString();
+
+        MvcResult ticketResult = mockMvc.perform(post("/api/v1/tickets")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "clientId": %d,
+                                  "deviceType": "Tablet",
+                                  "entryDate": "%s",
+                                  "problemDescription": "No image",
+                                  "status": "repairing",
+                                  "needsContract": false,
+                                  "contractSigned": false
+                                }
+                                """.formatted(clientId, today)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        long ticketId = readId(ticketResult);
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "board-scan.png",
+                MediaType.IMAGE_PNG_VALUE,
+                "png-content".getBytes()
+        );
+        int expectedFileSize = file.getBytes().length;
+
+        mockMvc.perform(multipart("/api/v1/attachments/upload/ticket/{ticketId}", ticketId)
+                        .file(file)
+                        .param("tag", "Escaneo")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fileType").value("image"))
+                .andExpect(jsonPath("$.fileFormat").value("png"))
+                .andExpect(jsonPath("$.fileSizeBytes").value(expectedFileSize))
+                .andExpect(jsonPath("$.tag").value("Escaneo"));
+
+        mockMvc.perform(get("/api/v1/attachments/recent")
+                        .param("limit", "5")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].filename").value("board-scan.png"))
+                .andExpect(jsonPath("$[0].fileType").value("image"))
+                .andExpect(jsonPath("$[0].fileFormat").value("png"))
+                .andExpect(jsonPath("$[0].fileSizeBytes").value(expectedFileSize))
+                .andExpect(jsonPath("$[0].tag").value("Escaneo"));
+
+        mockMvc.perform(get("/api/v1/dashboard/storage")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.usedBytes").value(expectedFileSize))
+                .andExpect(jsonPath("$.fileCount").value(1))
+                .andExpect(jsonPath("$.totalBytes").value(1048576))
+                .andExpect(jsonPath("$.availableBytes").value(1048576 - expectedFileSize))
+                .andExpect(jsonPath("$.source").value("configured"));
+
+        mockMvc.perform(get("/api/v1/dashboard/summary")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ticketsByStatus.repairing").value(1))
+                .andExpect(jsonPath("$.topClients[0].name").value("Dashboard Client"))
+                .andExpect(jsonPath("$.storage.usedBytes").value(expectedFileSize))
+                .andExpect(jsonPath("$.storage.fileCount").value(1))
+                .andExpect(jsonPath("$.storage.totalBytes").value(1048576))
+                .andExpect(jsonPath("$.storage.availableBytes").value(1048576 - expectedFileSize))
+                .andExpect(jsonPath("$.storage.source").value("configured"))
+                .andExpect(jsonPath("$.recentFiles[0].filename").value("board-scan.png"))
+                .andExpect(jsonPath("$.recentFiles[0].fileType").value("image"))
+                .andExpect(jsonPath("$.recentFiles[0].fileFormat").value("png"))
+                .andExpect(jsonPath("$.recentFiles[0].fileSizeBytes").value(expectedFileSize))
+                .andExpect(jsonPath("$.recentFiles[0].tag").value("Escaneo"));
     }
 
     private String bearerToken() {

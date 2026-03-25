@@ -11,8 +11,11 @@ import com.fixpoint.business.tickets.dto.CreateTicketDTO;
 import com.fixpoint.business.tickets.dto.TicketDTO;
 import com.fixpoint.business.tickets.dto.TicketStatusDefinitionDTO;
 import com.fixpoint.business.tickets.repository.TicketRepository;
+import com.fixpoint.config.cache.CacheInvalidationService;
+import com.fixpoint.config.cache.CacheNames;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -32,13 +35,16 @@ public class TicketServiceImpl implements TicketService {
     private final TicketPartRepository ticketPartRepository;
     private final TicketLogRepository ticketLogRepository;
     private final AttachmentRepository attachmentRepository;
+    private final CacheInvalidationService cacheInvalidationService;
 
     @Override
+    @Cacheable(CacheNames.TICKETS_ALL)
     public List<TicketDTO> getAll() {
         return ticketRepository.findAll().stream().map(this::toDTO).toList();
     }
 
     @Override
+    @Cacheable(cacheNames = CacheNames.TICKET_BY_ID, key = "#id")
     public TicketDTO getById(Long id) {
         return ticketRepository.findById(id)
                 .map(this::toDTO)
@@ -68,7 +74,9 @@ public class TicketServiceImpl implements TicketService {
                 .lastUpdated(LocalDateTime.now())
                 .build();
 
-        return toDTO(ticketRepository.save(ticket));
+        TicketDTO savedTicket = toDTO(ticketRepository.save(ticket));
+        evictTicketCaches();
+        return savedTicket;
     }
 
     @Override
@@ -101,7 +109,9 @@ public class TicketServiceImpl implements TicketService {
         ticket.setCreatedBy(dto.createdBy());
         ticket.setLastUpdated(LocalDateTime.now());
 
-        return toDTO(ticketRepository.save(ticket));
+        TicketDTO updatedTicket = toDTO(ticketRepository.save(ticket));
+        evictTicketCaches();
+        return updatedTicket;
     }
 
     @Override
@@ -121,20 +131,24 @@ public class TicketServiceImpl implements TicketService {
         }
 
         ticketRepository.deleteById(id);
+        evictTicketCaches();
     }
 
     @Override
+    @Cacheable(cacheNames = CacheNames.TICKETS_BY_CLIENT, key = "#clientId")
     public List<TicketDTO> getByClientId(Long clientId) {
         return ticketRepository.findByClientId(clientId).stream().map(this::toDTO).toList();
     }
 
     @Override
+    @Cacheable(cacheNames = CacheNames.TICKETS_BY_STATUS, key = "#status")
     public List<TicketDTO> getByStatus(String status) {
         TicketStatus parsedStatus = TicketStatus.parse(status);
         return ticketRepository.findByStatus(parsedStatus.value()).stream().map(this::toDTO).toList();
     }
 
     @Override
+    @Cacheable(CacheNames.TICKET_STATUS_DEFINITIONS)
     public List<TicketStatusDefinitionDTO> getStatusDefinitions() {
         return Arrays.stream(TicketStatus.values())
                 .map(status -> new TicketStatusDefinitionDTO(
@@ -160,6 +174,15 @@ public class TicketServiceImpl implements TicketService {
         if (status == TicketStatus.RETURNED && needsContract && !contractSigned) {
             throw new IllegalStateException("Cannot mark ticket as returned without signed contract");
         }
+    }
+
+    private void evictTicketCaches() {
+        if (cacheInvalidationService == null) {
+            return;
+        }
+
+        cacheInvalidationService.evictTickets();
+        cacheInvalidationService.evictDashboard();
     }
 
     private TicketDTO toDTO(Ticket t) {

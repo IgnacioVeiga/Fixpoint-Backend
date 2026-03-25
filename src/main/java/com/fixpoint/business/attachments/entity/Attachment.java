@@ -31,8 +31,19 @@ public class Attachment {
     private String filepath;
 
     @Column(name = "file_type", nullable = false)
-    private String fileType; // photo, contract, invoice, other
+    private String fileType; // image, document, spreadsheet, archive, other
+
+    @Column(name = "file_format", nullable = false)
+    private String fileFormat;
+
+    @Column(name = "file_size_bytes", nullable = false)
+    @Builder.Default
+    private Long fileSizeBytes = 0L;
+
+    @Column(name = "tag")
+    private String tag;
 
     @Column(name = "uploaded_at")
+    @Builder.Default
     private LocalDateTime uploadedAt = LocalDateTime.now();
 }

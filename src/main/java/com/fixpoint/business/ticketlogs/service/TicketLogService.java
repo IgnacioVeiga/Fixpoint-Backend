@@ -8,6 +8,7 @@ import com.fixpoint.business.tickets.domain.TicketStatus;
 import com.fixpoint.business.tickets.entity.Ticket;
 import com.fixpoint.business.tickets.repository.TicketRepository;
 import com.fixpoint.business.tickets.service.TicketServiceImpl;
+import com.fixpoint.config.cache.CacheInvalidationService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,7 @@ public class TicketLogService {
 
     private final TicketLogRepository ticketLogRepository;
     private final TicketRepository ticketRepository;
+    private final CacheInvalidationService cacheInvalidationService;
 
     @Transactional
     public TicketLogDTO createLog(Long ticketId, CreateTicketLogDTO dto) {
@@ -44,6 +46,9 @@ public class TicketLogService {
         TicketLog saved = ticketLogRepository.save(log);
         ticket.setLastUpdated(now);
         ticketRepository.save(ticket);
+        if (cacheInvalidationService != null) {
+            cacheInvalidationService.evictTickets();
+        }
         return toDTO(saved);
     }
 

@@ -5,8 +5,11 @@ import com.fixpoint.business.inventory.entity.Inventory;
 import com.fixpoint.business.inventory.repository.InventoryRepository;
 import com.fixpoint.business.ticketparts.repository.TicketPartRepository;
 import com.fixpoint.business.ticketparts.service.TicketPartService;
+import com.fixpoint.config.cache.CacheInvalidationService;
+import com.fixpoint.config.cache.CacheNames;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -17,8 +20,10 @@ public class InventoryServiceImpl implements InventoryService {
 
     private final InventoryRepository repository;
     private final TicketPartRepository ticketPartRepository;
+    private final CacheInvalidationService cacheInvalidationService;
 
     @Override
+    @Cacheable(CacheNames.INVENTORY_ALL)
     public List<InventoryDTO> findAll() {
         return repository.findAll().stream()
                 .map(this::toDto)
@@ -26,6 +31,7 @@ public class InventoryServiceImpl implements InventoryService {
     }
 
     @Override
+    @Cacheable(cacheNames = CacheNames.INVENTORY_BY_ID, key = "#id")
     public InventoryDTO findById(Long id) {
         return repository.findById(id)
                 .map(this::toDto)
@@ -35,7 +41,9 @@ public class InventoryServiceImpl implements InventoryService {
     @Override
     public InventoryDTO save(InventoryDTO dto) {
         Inventory entity = toEntity(dto);
-        return toDto(repository.save(entity));
+        InventoryDTO savedInventory = toDto(repository.save(entity));
+        evictInventoryCaches();
+        return savedInventory;
     }
 
     @Override
@@ -49,7 +57,9 @@ public class InventoryServiceImpl implements InventoryService {
         existing.setSource(dto.getSource());
         existing.setQuantity(dto.getQuantity());
         existing.setLocation(dto.getLocation());
-        return toDto(repository.save(existing));
+        InventoryDTO updatedInventory = toDto(repository.save(existing));
+        evictInventoryCaches();
+        return updatedInventory;
     }
 
     @Override
@@ -62,6 +72,16 @@ public class InventoryServiceImpl implements InventoryService {
         }
 
         repository.delete(inventory);
+        evictInventoryCaches();
+    }
+
+    private void evictInventoryCaches() {
+        if (cacheInvalidationService == null) {
+            return;
+        }
+
+        cacheInvalidationService.evictInventory();
+        cacheInvalidationService.evictDashboard();
     }
 
     private InventoryDTO toDto(Inventory i) {

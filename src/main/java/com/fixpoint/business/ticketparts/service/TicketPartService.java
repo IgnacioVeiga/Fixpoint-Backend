@@ -10,6 +10,7 @@ import com.fixpoint.business.tickets.domain.TicketStatus;
 import com.fixpoint.business.tickets.entity.Ticket;
 import com.fixpoint.business.tickets.repository.TicketRepository;
 import com.fixpoint.business.tickets.service.TicketServiceImpl;
+import com.fixpoint.config.cache.CacheInvalidationService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -26,6 +27,7 @@ public class TicketPartService {
     private final TicketPartRepository ticketPartRepository;
     private final TicketRepository ticketRepository;
     private final InventoryRepository inventoryRepository;
+    private final CacheInvalidationService cacheInvalidationService;
 
     @Transactional
     public TicketPartDTO addPartToTicket(Long ticketId, AddTicketPartDTO dto) {
@@ -62,6 +64,11 @@ public class TicketPartService {
 
         ticket.setLastUpdated(LocalDateTime.now());
         ticketRepository.save(ticket);
+        if (cacheInvalidationService != null) {
+            cacheInvalidationService.evictTickets();
+            cacheInvalidationService.evictInventory();
+            cacheInvalidationService.evictDashboard();
+        }
 
         return toDTO(saved);
     }

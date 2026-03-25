@@ -25,10 +25,17 @@ Flyway strategy for `Fixpoint-Backend`.
 ## Current baseline
 
 - `common/V1__init_database.sql`
-- `common/V2__add_authentication.sql`
-- `common/V3__add_refresh_sessions.sql`
 - `dev/V101__bootstrap_dev_users.sql`
 - `prod/V301__bootstrap_prod_users.sql`
+
+## Baseline notes
+
+- `V1` already creates the current attachment schema:
+  - `fileType`: technical file category such as `image`, `document`, `spreadsheet`, `archive`
+  - `fileFormat`: explicit stored extension such as `pdf`, `png`, `xlsx`
+  - `fileSizeBytes`: stored file size used by dashboard storage metrics
+  - `tag`: optional business label such as `Presupuesto`, `Escaneo`, `Factura`
+- `V1` also includes authentication tables (`app_users`, `refresh_sessions`) so fresh environments start from the current model directly.
 
 ## Related docs
 

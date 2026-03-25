@@ -54,14 +54,17 @@ CREATE TABLE IF NOT EXISTS ticket_logs (
 );
 
 -- ======================================
--- Archivos adjuntos relacionados a tickets (fotos, PDFs, etc.)
+-- Archivos adjuntos relacionados a tickets
 -- ======================================
 CREATE TABLE IF NOT EXISTS attachments (
     id SERIAL PRIMARY KEY,
     ticket_id INTEGER NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
     filename TEXT NOT NULL,
     filepath TEXT NOT NULL,  -- ruta relativa o absoluta al archivo
-    file_type VARCHAR(20) NOT NULL CHECK (file_type IN ('photo', 'contract', 'invoice', 'other')),
+    file_type VARCHAR(20) NOT NULL CHECK (file_type IN ('image', 'document', 'spreadsheet', 'archive', 'other')),
+    file_format VARCHAR(20) NOT NULL,
+    file_size_bytes BIGINT NOT NULL DEFAULT 0,
+    tag VARCHAR(80),
     uploaded_at TIMESTAMP DEFAULT NOW()
 );
 
@@ -92,6 +95,32 @@ CREATE TABLE IF NOT EXISTS ticket_parts (
 );
 
 -- ======================================
+-- Usuarios para autenticación de la API
+-- ======================================
+CREATE TABLE IF NOT EXISTS app_users (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(100) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    role VARCHAR(20) NOT NULL CHECK (role IN ('ADMIN', 'TECH')),
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- ======================================
+-- Sesiones de refresh token
+-- ======================================
+CREATE TABLE IF NOT EXISTS refresh_sessions (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+    token_hash VARCHAR(128) NOT NULL UNIQUE,
+    remember_me BOOLEAN NOT NULL DEFAULT FALSE,
+    issued_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMP NOT NULL,
+    last_used_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    revoked_at TIMESTAMP NULL
+);
+
+-- ======================================
 -- Indices útiles para búsquedas frecuentes
 -- ======================================
 CREATE INDEX IF NOT EXISTS idx_tickets_client ON tickets(client_id);
@@ -99,6 +128,9 @@ CREATE INDEX IF NOT EXISTS idx_ticket_logs_ticket ON ticket_logs(ticket_id);
 CREATE INDEX IF NOT EXISTS idx_attachments_ticket ON attachments(ticket_id);
 CREATE INDEX IF NOT EXISTS idx_ticket_parts_ticket ON ticket_parts(ticket_id);
 CREATE INDEX IF NOT EXISTS idx_ticket_parts_inventory ON ticket_parts(inventory_id);
+CREATE INDEX IF NOT EXISTS idx_refresh_sessions_user_id ON refresh_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_refresh_sessions_expires_at ON refresh_sessions(expires_at);
+CREATE INDEX IF NOT EXISTS idx_refresh_sessions_revoked_at ON refresh_sessions(revoked_at);
 
 -- ======================================
 -- Comentarios finales:

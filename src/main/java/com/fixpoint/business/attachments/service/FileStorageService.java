@@ -11,9 +11,11 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.nio.file.Files;
+import java.nio.file.FileStore;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.Optional;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -80,5 +82,17 @@ public class FileStorageService {
         } catch (IOException ex) {
             throw new IllegalStateException("Could not delete file " + fileName, ex);
         }
+    }
+
+    public Optional<StorageCapacity> resolveStorageCapacity() {
+        try {
+            FileStore fileStore = Files.getFileStore(this.fileStorageLocation);
+            return Optional.of(new StorageCapacity(fileStore.getTotalSpace(), fileStore.getUsableSpace()));
+        } catch (IOException | UnsupportedOperationException | SecurityException ex) {
+            return Optional.empty();
+        }
+    }
+
+    public record StorageCapacity(long totalBytes, long availableBytes) {
     }
 }

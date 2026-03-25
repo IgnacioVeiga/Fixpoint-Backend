@@ -19,6 +19,7 @@ Quick code navigation map for `Fixpoint-Backend`.
 
 ## Business domains
 
+- `src/main/java/com/fixpoint/business/dashboard/**`
 - `src/main/java/com/fixpoint/business/attachments/**`
 - `src/main/java/com/fixpoint/business/clients/**`
 - `src/main/java/com/fixpoint/business/inventory/**`
