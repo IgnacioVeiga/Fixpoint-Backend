@@ -5,7 +5,8 @@ set ENVIRONMENT=%1
 if "%ENVIRONMENT%"=="" set ENVIRONMENT=dev
 set MODE=%2
 if "%MODE%"=="" set MODE=local
-set ENV_FILE=.env.%ENVIRONMENT%
+for %%I in ("%~dp0..") do set "PROJECT_ROOT=%%~fI"
+set ENV_FILE=%PROJECT_ROOT%\.env.%ENVIRONMENT%
 set DB_CONTAINER_NAME=Fixpoint_DB
 
 if /I "%MODE%"=="docker" (
@@ -16,8 +17,11 @@ if /I "%MODE%"=="docker" (
     )
 
     echo Starting PostgreSQL container for backend using '%ENV_FILE%'...
+    pushd "%PROJECT_ROOT%"
     docker compose --env-file "%ENV_FILE%" up -d postgres
-    exit /b %ERRORLEVEL%
+    set DOCKER_EXIT=%ERRORLEVEL%
+    popd
+    exit /b %DOCKER_EXIT%
 )
 
 if /I "%MODE%"=="auto" (
@@ -28,8 +32,11 @@ if /I "%MODE%"=="auto" (
     )
 
     echo Starting PostgreSQL container for backend using '%ENV_FILE%'...
+    pushd "%PROJECT_ROOT%"
     docker compose --env-file "%ENV_FILE%" up -d postgres
-    if errorlevel 1 exit /b %ERRORLEVEL%
+    set DOCKER_EXIT=%ERRORLEVEL%
+    popd
+    if errorlevel 1 exit /b %DOCKER_EXIT%
 
     call :wait_for_db
     if errorlevel 1 exit /b 1
@@ -54,8 +61,11 @@ for /f "usebackq tokens=1* delims==" %%A in ("%ENV_FILE%") do (
 if "%SPRING_PROFILES_ACTIVE%"=="" set SPRING_PROFILES_ACTIVE=%ENVIRONMENT%
 
 echo Starting backend locally with profile '%SPRING_PROFILES_ACTIVE%' using '%ENV_FILE%'...
+pushd "%PROJECT_ROOT%"
 call mvnw.cmd spring-boot:run
-exit /b %ERRORLEVEL%
+set MVN_EXIT=%ERRORLEVEL%
+popd
+exit /b %MVN_EXIT%
 
 :wait_for_db
 set ATTEMPT=1

@@ -48,6 +48,12 @@ set +a
 ./scripts/run.sh dev auto
 ```
 
+```powershell
+.\scripts\run.ps1 dev local
+.\scripts\run.ps1 dev docker
+.\scripts\run.ps1 dev auto
+```
+
 ## 4. First Startup Checks
 
 On startup, verify:

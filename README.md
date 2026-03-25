@@ -10,6 +10,8 @@ cookie-based refresh sessions.
 - Authentication:
   - short-lived access token (`Bearer`)
   - HttpOnly refresh cookie with rotation + server-side revocation
+- Dashboard summary endpoint for operational metrics and recent files
+- Attachment metadata with inferred file category/format and optional tag
 
 ## Quick Start
 
@@ -26,6 +28,12 @@ Helper scripts:
 ./scripts/run.sh dev local
 ./scripts/run.sh dev docker
 ./scripts/run.sh dev auto
+```
+
+```powershell
+.\scripts\run.ps1 dev local
+.\scripts\run.ps1 dev docker
+.\scripts\run.ps1 dev auto
 ```
 
 ## Start Here (Docs)

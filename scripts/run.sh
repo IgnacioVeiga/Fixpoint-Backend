@@ -3,7 +3,9 @@ set -euo pipefail
 
 ENVIRONMENT="${1:-dev}"
 MODE="${2:-local}"
-ENV_FILE=".env.${ENVIRONMENT}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+ENV_FILE="${PROJECT_ROOT}/.env.${ENVIRONMENT}"
 DB_CONTAINER_NAME="Fixpoint_DB"
 
 wait_for_db() {
@@ -34,7 +36,10 @@ if [[ "${MODE}" == "docker" || "${MODE}" == "auto" ]]; then
   fi
 
   echo "Starting PostgreSQL container for backend using '${ENV_FILE}'..."
-  docker compose --env-file "${ENV_FILE}" up -d postgres
+  (
+    cd "${PROJECT_ROOT}"
+    docker compose --env-file "${ENV_FILE}" up -d postgres
+  )
   if [[ "${MODE}" == "docker" ]]; then
     exit $?
   fi
@@ -55,4 +60,7 @@ set +a
 export SPRING_PROFILES_ACTIVE="${SPRING_PROFILES_ACTIVE:-${ENVIRONMENT}}"
 
 echo "Starting backend locally with profile '${SPRING_PROFILES_ACTIVE}' using '${ENV_FILE}'..."
-./mvnw spring-boot:run
+(
+  cd "${PROJECT_ROOT}"
+  ./mvnw spring-boot:run
+)
