@@ -456,6 +456,16 @@ class ApiIntegrationTest {
                 .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, containsString("diagnostic-note.txt")))
                 .andExpect(content().bytes("diagnostic-content".getBytes()));
 
+        MvcResult thumbnailResult = mockMvc.perform(get("/api/v1/attachments/thumbnail/{id}", attachmentId)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_TYPE, MediaType.IMAGE_PNG_VALUE))
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, containsString("attachment-thumbnail-" + attachmentId + ".png")))
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, containsString("private")))
+                .andReturn();
+
+        org.junit.jupiter.api.Assertions.assertTrue(thumbnailResult.getResponse().getContentAsByteArray().length > 0);
+
         mockMvc.perform(delete("/api/v1/attachments/{id}", attachmentId)
                         .header(HttpHeaders.AUTHORIZATION, bearerToken()))
                 .andExpect(status().isNoContent());

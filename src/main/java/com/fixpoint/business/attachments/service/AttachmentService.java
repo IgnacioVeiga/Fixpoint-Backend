@@ -13,6 +13,7 @@ public interface AttachmentService {
     AttachmentDTO save(AttachmentDTO dto);
     AttachmentDTO uploadFile(Long ticketId, MultipartFile file, String tag);
     Resource downloadFile(Long id);
+    Resource downloadThumbnail(Long id);
     void delete(Long id);
     AttachmentDTO replaceFile(Long id, MultipartFile file, String tag);
 }

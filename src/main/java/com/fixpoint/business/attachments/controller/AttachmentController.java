@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.MediaTypeFactory;
@@ -16,6 +17,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/api/v1/attachments")
@@ -61,6 +63,17 @@ public class AttachmentController {
         return ResponseEntity.ok()
                 .contentType(mediaType)
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + attachment.getFilename() + "\"")
+                .body(resource);
+    }
+
+    @GetMapping("/thumbnail/{id}")
+    public ResponseEntity<Resource> downloadThumbnail(@PathVariable Long id) {
+        Resource resource = attachmentService.downloadThumbnail(id);
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.IMAGE_PNG)
+                .cacheControl(CacheControl.maxAge(1, TimeUnit.DAYS).cachePrivate())
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"attachment-thumbnail-%d.png\"".formatted(id))
                 .body(resource);
     }
 

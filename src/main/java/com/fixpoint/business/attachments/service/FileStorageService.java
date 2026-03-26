@@ -22,14 +22,18 @@ import java.util.UUID;
 @Service
 public class FileStorageService {
     private static final String FILE_NOT_FOUND = "File not found: ";
+    private static final String THUMBNAIL_NOT_FOUND = "Thumbnail not found: ";
     private static final String STORAGE_ERROR = "Could not store file. Please try again!";
     private final Path fileStorageLocation;
+    private final Path thumbnailStorageLocation;
 
     public FileStorageService(@Value("${app.file.upload-dir}") String uploadDir) {
         this.fileStorageLocation = Paths.get(uploadDir)
                 .toAbsolutePath().normalize();
+        this.thumbnailStorageLocation = this.fileStorageLocation.resolve(".thumbnails");
         try {
             Files.createDirectories(this.fileStorageLocation);
+            Files.createDirectories(this.thumbnailStorageLocation);
         } catch (IOException ex) {
             throw new IllegalStateException("Could not create the directory where the uploaded files will be stored.", ex);
         }
@@ -63,7 +67,7 @@ public class FileStorageService {
 
     public Resource loadFileAsResource(String fileName) {
         try {
-            Path filePath = this.fileStorageLocation.resolve(fileName).normalize();
+            Path filePath = resolveStoredFilePath(fileName);
             Resource resource = new UrlResource(filePath.toUri());
             if (resource.exists()) {
                 return resource;
@@ -77,10 +81,44 @@ public class FileStorageService {
 
     public void deleteFile(String fileName) {
         try {
-            Path filePath = this.fileStorageLocation.resolve(fileName).normalize();
+            Path filePath = resolveStoredFilePath(fileName);
             Files.deleteIfExists(filePath);
         } catch (IOException ex) {
             throw new IllegalStateException("Could not delete file " + fileName, ex);
+        }
+    }
+
+    public Path resolveStoredFilePath(String fileName) {
+        return this.fileStorageLocation.resolve(fileName).normalize();
+    }
+
+    public Path resolveThumbnailPath(String fileName) {
+        String baseName = fileName;
+        int extensionIndex = fileName.lastIndexOf('.');
+        if (extensionIndex > 0) {
+            baseName = fileName.substring(0, extensionIndex);
+        }
+        return this.thumbnailStorageLocation.resolve(baseName + ".png").normalize();
+    }
+
+    public Resource loadThumbnailAsResource(String fileName) {
+        try {
+            Path thumbnailPath = resolveThumbnailPath(fileName);
+            Resource resource = new UrlResource(thumbnailPath.toUri());
+            if (resource.exists()) {
+                return resource;
+            }
+            throw new EntityNotFoundException(THUMBNAIL_NOT_FOUND + fileName);
+        } catch (MalformedURLException ex) {
+            throw new EntityNotFoundException(THUMBNAIL_NOT_FOUND + fileName);
+        }
+    }
+
+    public void deleteThumbnail(String fileName) {
+        try {
+            Files.deleteIfExists(resolveThumbnailPath(fileName));
+        } catch (IOException ex) {
+            throw new IllegalStateException("Could not delete thumbnail " + fileName, ex);
         }
     }
 

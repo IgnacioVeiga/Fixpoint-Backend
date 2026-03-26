@@ -11,6 +11,8 @@ import com.fixpoint.config.cache.CacheInvalidationService;
 import com.fixpoint.config.cache.CacheNames;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.PageRequest;
@@ -18,6 +20,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -29,6 +32,7 @@ public class AttachmentServiceImpl implements AttachmentService {
 
     private static final String ATTACHMENT_NOT_FOUND = "Attachment not found";
     public static final String ORIGINAL_FILENAME_MUST_NOT_BE_NULL = "Original filename must not be null";
+    private static final Logger LOGGER = LoggerFactory.getLogger(AttachmentServiceImpl.class);
     private static final Map<String, String> SUPPORTED_FORMATS = Map.ofEntries(
             Map.entry("jpg", "image"),
             Map.entry("jpeg", "image"),
@@ -57,6 +61,7 @@ public class AttachmentServiceImpl implements AttachmentService {
     private final AttachmentRepository attachmentRepo;
     private final TicketRepository ticketRepo;
     private final FileStorageService fileStorageService;
+    private final AttachmentThumbnailService attachmentThumbnailService;
     private final CacheInvalidationService cacheInvalidationService;
 
     @Override
@@ -103,6 +108,7 @@ public class AttachmentServiceImpl implements AttachmentService {
                 .build();
 
         AttachmentDTO savedAttachment = toDto(attachmentRepo.save(attachment));
+        generateThumbnailSafely(attachment);
         evictAttachmentCaches();
         return savedAttachment;
     }
@@ -139,11 +145,19 @@ public class AttachmentServiceImpl implements AttachmentService {
     }
 
     @Override
+    public Resource downloadThumbnail(Long id) {
+        Attachment attachment = attachmentRepo.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException(ATTACHMENT_NOT_FOUND));
+        return attachmentThumbnailService.loadOrCreateThumbnail(attachment);
+    }
+
+    @Override
     public void delete(Long id) {
         Attachment attachment = attachmentRepo.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException(ATTACHMENT_NOT_FOUND));
         ensureTicketIsOpen(attachment.getTicket(), "delete attachments");
 
+        attachmentThumbnailService.deleteThumbnail(attachment.getFilepath());
         fileStorageService.deleteFile(attachment.getFilepath());
         attachmentRepo.delete(attachment);
         evictAttachmentCaches();
@@ -155,6 +169,7 @@ public class AttachmentServiceImpl implements AttachmentService {
                 .orElseThrow(() -> new EntityNotFoundException(ATTACHMENT_NOT_FOUND));
         ensureTicketIsOpen(attachment.getTicket(), "replace attachments");
 
+        attachmentThumbnailService.deleteThumbnail(attachment.getFilepath());
         fileStorageService.deleteFile(attachment.getFilepath());
         ResolvedAttachmentMetadata metadata = resolveMetadata(file);
         String storedFileName = fileStorageService.storeFile(file);
@@ -164,11 +179,13 @@ public class AttachmentServiceImpl implements AttachmentService {
         attachment.setFileType(metadata.fileType());
         attachment.setFileFormat(metadata.fileFormat());
         attachment.setFileSizeBytes(file.getSize());
+        attachment.setUploadedAt(LocalDateTime.now());
         if (tag != null) {
             attachment.setTag(normalizeTag(tag));
         }
 
         AttachmentDTO updatedAttachment = toDto(attachmentRepo.save(attachment));
+        generateThumbnailSafely(attachment);
         evictAttachmentCaches();
         return updatedAttachment;
     }
@@ -239,6 +256,14 @@ public class AttachmentServiceImpl implements AttachmentService {
 
     private long normalizeFileSize(Long fileSizeBytes) {
         return fileSizeBytes == null ? 0L : Math.max(0L, fileSizeBytes);
+    }
+
+    private void generateThumbnailSafely(Attachment attachment) {
+        try {
+            attachmentThumbnailService.createThumbnail(attachment);
+        } catch (RuntimeException ex) {
+            LOGGER.warn("Could not generate thumbnail for attachment {}", attachment.getId(), ex);
+        }
     }
 
     private record ResolvedAttachmentMetadata(String originalFilename, String fileType, String fileFormat) {
